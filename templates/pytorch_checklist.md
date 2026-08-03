@@ -1,0 +1,711 @@
+# PyTorch Accelerator Integration Readiness Checklist (Unified)
+
+> A comprehensive template for evaluating hardware accelerator integration
+> readiness with PyTorch -- covers both **PrivateUse1 (out-of-tree)** and
+> **Fork (in-tree/vendor fork)** integration paths.
+>
+> Items marked with **[PU1]** apply only to PrivateUse1 backends.
+> Items marked with **[Fork]** apply only to fork-based backends.
+> Unmarked items apply to **both** paths.
+
+**Backend under evaluation**: _[FILL: backend name]_
+**Integration path**: _[FILL: auto-detected by agent]_
+**Dispatch key**: _[FILL: auto-detected by agent]_
+**Evaluation date**: _[FILL: date]_
+**Evaluator**: _[FILL: human or agent]_
+**Fork base** (if fork): _[FILL: auto-detected by agent]_
+
+**Status markers**: `[ ]` Not Ready | `[~]` Partially Ready | `[x]` Ready | `[N/A]` Not applicable
+
+**Maturity levels**: Not Started | Prototype | Alpha | Beta | Production
+
+---
+
+## Readiness Score & Summary
+
+### Executive Summary
+
+_[FILL: Write a concise summary covering:
+- **Overall verdict** and score (X.X / 10)
+- **Key strengths**:
+  - Top strength 1
+  - Top strength 2
+  - Top strength 3
+- **Key gaps**:
+  - Critical gap 1
+  - Critical gap 2
+  - Critical gap 3
+- **Key next steps**:
+  - Highest-impact action 1
+  - Highest-impact action 2
+  - Highest-impact action 3
+- **Notable insights**:
+  - Surprising finding or important context 1
+  - Surprising finding or important context 2]_
+
+### Scoring Model
+
+Each row has a **point value** (1-3) reflecting its importance:
+- **3 pts** = Critical (blocks basic functionality)
+- **2 pts** = Important (expected for production use)
+- **1 pt** = Nice-to-have (polish, edge cases)
+
+Each section has a **rank** (1-3) reflecting its tier:
+- **Rank 1** = Foundational (blocks basic functionality)
+- **Rank 2** = Core Production (expected for production use)
+- **Rank 3** = Quality of Life (polish, ecosystem, sustainability)
+
+**Row scoring**: `[x]` = full points, `[~]` = half points, `[ ]` = 0, `[N/A]` = excluded from max
+
+**Section score**: `section_pct = earned_pts / max_pts` (percentage only, no multiplication by rank)
+
+**Overall score formula**:
+```
+weight_r = 1 / rank
+Overall Score = (sum(section_pct * weight_r) / sum(weight_r)) * 10
+```
+where the sums are over all applicable sections (excluding fully N/A sections).
+
+**Readiness verdict**:
+- **0 - 4** = Not Ready
+- **4 - 7** = Partially Ready
+- **7 - 10** = Ready
+
+### Section Scores
+
+| Section | Rank | Max Pts | Earned | Pct | Weighted |
+|---------|------|---------|--------|-----|----------|
+| **Rank 1 -- Foundational** | | | | | |
+| Device Registration & Management | 1 | | | | |
+| Operator Registration | 1 | | | | |
+| Autograd | 1 | | | | |
+| Device Guard | 1 | | | | |
+| Accelerator Hooks [PU1] | 1 | | | | |
+| Memory & Allocator | 1 | | | | |
+| **Rank 2 -- Core Production** | | | | | |
+| Serialization & Model Portability | 2 | | | | |
+| Python Frontend & Device-Agnostic APIs | 2 | | | | |
+| AMP | 2 | | | | |
+| torch.compile / Inductor | 2 | | | | |
+| Distributed Training | 2 | | | | |
+| Dtype Support Matrix | 2 | | | | |
+| Numerical Accuracy | 2 | | | | |
+| Testing & Validation | 2 | | | | |
+| **Rank 3 -- Quality of Life** | | | | | |
+| Streams & Events | 3 | | | | |
+| RNG & Generator | 3 | | | | |
+| Autoload [PU1] | 3 | | | | |
+| DataLoader Integration | 3 | | | | |
+| Device Behavior Parity with CUDA | 3 | | | | |
+| Profiler | 3 | | | | |
+| Ecosystem Compatibility | 3 | | | | |
+| Future / In-Progress Modules | 3 | | | | |
+| **TOTAL** | | | | | |
+
+### Calculation
+
+```
+Section Pct = earned_pts / max_pts (excluding N/A rows)
+weight_r = 1 / rank
+Weighted = Pct * (1 / rank)
+Overall Score = (sum(Weighted) / sum(weight_r for applicable sections)) * 10
+```
+
+### Final Verdict
+
+| Score | Verdict |
+|-------|---------|
+| 0 - 4 | **Not Ready** |
+| 4 - 7 | **Partially Ready** |
+| 7 - 10 | **Ready** |
+
+**Overall Score**: _____ / 10
+**Verdict**: _____
+
+### Summary
+
+_[FILL: Write as bullet points:
+- **Score**: X.X/10 (Verdict)
+- **Production-quality areas**: List fully implemented areas
+- **Operator coverage**: Op count and categories
+- **Gaps**:
+  - Gap 1
+  - Gap 2
+- **Next steps**:
+  - Action 1
+  - Action 2
+- **Character**: One line on backend's focus and approach]_
+
+---
+
+## 0. Source Discovery & Integration Path Detection
+
+The agent handles everything -- the user only provides a backend name (e.g.,
+"ascend npu", "habana gaudi", "graphcore ipu"). The agent locates the source
+code and determines the integration path automatically.
+
+### Step 1: Locate the source code
+
+The user may not have the repo locally. The agent should:
+
+1. **Check locally first**:
+   - `pip show torch_<name>` or `pip show <name>` to find installed package location
+   - `python -c "import torch_<name>; print(torch_<name>.__file__)"` if importable
+   - Search current directory and parents for the backend source
+
+2. **Search GitHub/GitLab if not found locally**:
+   - Search `github.com/<vendor>/` for vendor backends (e.g., `huawei/torch_npu`, `RBLN-SW/torch-rbln`)
+   - Try common naming patterns: `torch-<name>`, `torch_<name>`, `pytorch-<name>`, `<vendor>-pytorch`
+   - Use `gh search repos "torch <name> pytorch backend"` or web search
+
+3. **Clone if needed**: Once found, clone to a scratch location:
+   - `git clone <url> /tmp/<name>` or `agent_space/<name>`
+   - Shallow clone is fine: `git clone --depth 1`
+
+4. **Ask the user** only if the source cannot be found after searching.
+
+Record the source location and proceed.
+
+| Source Discovery | Value | Notes |
+|-----------------|-------|-------|
+| **Source location** | _[local path or URL]_ | |
+| **How found** | _[local / pip / GitHub / user-provided]_ | |
+| **Repository URL** | _[if applicable]_ | |
+
+### Step 2: Detect integration path
+
+1. Check if the backend is a **separate package** (e.g., `torch_npu`, `torch_xla`):
+   - Search for `rename_privateuse1_backend` or `register_privateuse1_backend` in the source
+   - Search for `entry_points` with `torch.backends` group in `setup.py`/`pyproject.toml`
+   - If found -> **PrivateUse1 (out-of-tree)**
+
+2. Check if the backend is **inside a PyTorch fork**:
+   - Check if `c10/core/DeviceType.h` contains a custom device type entry
+   - Check if `c10/core/DispatchKey.h` contains a custom dispatch key
+   - Check if `aten/src/ATen/native/native_functions.yaml` has dispatch entries for the backend
+   - If found -> **Fork (in-tree)**
+
+3. **Hybrid** (rare): Some backends start as a fork and migrate to PrivateUse1, or
+   maintain both paths. If both signals are present, note it and evaluate both.
+
+| Signal | Detected | Value | Notes |
+|--------|----------|-------|-------|
+| `rename_privateuse1_backend()` call found | `[ ]` | | |
+| `entry_points` for `torch.backends` found | `[ ]` | | |
+| Custom entry in `DeviceType.h` | `[ ]` | | |
+| Custom entry in `DispatchKey.h` | `[ ]` | | |
+| Dispatch entries in `native_functions.yaml` | `[ ]` | | |
+| Separate pip-installable package | `[ ]` | | |
+| Modifies PyTorch core source files | `[ ]` | | |
+| **Detected path** | | _[PU1 / Fork / Hybrid]_ | |
+| **Dispatch key** | | _[PrivateUse1 / custom]_ | |
+| **Fork base** (if fork) | | _[version/commit]_ | |
+
+Once detected, the agent should:
+- Mark all items for the **other** path as `[N/A]`
+- Fill the header metadata fields above with detected values
+- Proceed with evaluation of applicable items
+
+---
+
+## 1. Device Registration & Management -- Rank: **1**
+
+### 1.1 Backend Registration
+
+| # | Item | Path | Pts | Status | Notes |
+|---|------|------|-----|--------|-------|
+| 1.1.1 | Backend name registered via `rename_privateuse1_backend("<name>")` | PU1 | 3 | `[ ]` | |
+| 1.1.2 | `torch._register_device_module("<name>", module)` | PU1 | 3 | `[ ]` | |
+| 1.1.3 | `generate_methods_for_privateuse1_backend("<name>")` | PU1 | 2 | `[ ]` | |
+| 1.1.4 | Device type added to `c10::DeviceType` enum | Fork | 3 | `[ ]` | |
+| 1.1.5 | Custom dispatch key registered in `DispatchKey.h` | Fork | 3 | `[ ]` | |
+| 1.1.6 | `torch.device("<name>")` and `torch.device("<name>:0")` work | Both | 3 | `[ ]` | |
+
+### 1.2 Device Management
+
+| # | Item | Pts | Status | Notes |
+|---|------|-----|--------|-------|
+| 1.2.1 | `deviceCount()` returns correct count | 3 | `[ ]` | |
+| 1.2.2 | `setCurrentDevice()` / `getCurrentDevice()` | 3 | `[ ]` | |
+| 1.2.3 | `exchangeDevice()` / `maybeExchangeDevice()` | 2 | `[ ]` | |
+| 1.2.4 | Multi-device indexing (`<name>:0`, `<name>:1`, ...) | 2 | `[ ]` | |
+| 1.2.5 | `torch.<name>.is_available()` | 3 | `[ ]` | |
+| 1.2.6 | `torch.<name>.device_count()` | 3 | `[ ]` | |
+| 1.2.7 | `torch.<name>.synchronize()` | 2 | `[ ]` | |
+
+---
+
+## 2. Accelerator Hooks **[PU1]** -- Rank: **1**
+
+### Mandatory hooks (throw if not overridden)
+
+| # | Hook | Pts | Status | Notes |
+|---|------|-----|--------|-------|
+| 2.1 | `hasPrimaryContext(device_index)` | 3 | `[ ]` | |
+| 2.2 | `getDefaultGenerator(device_index)` | 3 | `[ ]` | |
+| 2.3 | `getNewGenerator(device_index)` | 2 | `[ ]` | |
+| 2.4 | `getDeviceFromPtr(void* data)` | 3 | `[ ]` | |
+| 2.5 | `getPinnedMemoryAllocator()` | 2 | `[ ]` | |
+| 2.6 | `resizePrivateUse1Bytes(storage, newsize)` | 2 | `[ ]` | |
+| 2.7 | `isBuilt()` | 3 | `[ ]` | |
+| 2.8 | `isAvailable()` | 3 | `[ ]` | |
+
+### Hooks with safe defaults (override recommended)
+
+| # | Hook | Default | Pts | Status | Notes |
+|---|------|---------|-----|--------|-------|
+| 2.9 | `init()` | no-op | 2 | `[ ]` | |
+| 2.10 | `isPinnedPtr(data)` | returns false | 1 | `[ ]` | |
+| 2.11 | `deviceCount()` | returns 0 | 3 | `[ ]` | |
+| 2.12 | `setCurrentDevice(device)` | throws | 3 | `[ ]` | |
+| 2.13 | `getCurrentDevice()` | throws | 3 | `[ ]` | |
+| 2.14 | `exchangeDevice(device)` | throws | 2 | `[ ]` | |
+| 2.15 | `maybeExchangeDevice(device)` | throws | 1 | `[ ]` | |
+
+---
+
+## 3. Device Guard -- Rank: **1**
+
+| # | Item | Path | Pts | Status | Notes |
+|---|------|------|-----|--------|-------|
+| 3.1 | `c10::impl::DeviceGuardImpl` subclass implemented | Both | 3 | `[ ]` | |
+| 3.2 | Registered via `C10_REGISTER_GUARD_IMPL(PrivateUse1, GuardClass)` | PU1 | 3 | `[ ]` | |
+| 3.3 | Registered via `C10_REGISTER_GUARD_IMPL(<Key>, GuardClass)` | Fork | 3 | `[ ]` | |
+| 3.4 | `getDevice()` / `setDevice()` / `uncheckedSetDevice()` | Both | 3 | `[ ]` | |
+| 3.5 | `getStream()` / `setStream()` / `exchangeStream()` | Both | 2 | `[ ]` | |
+| 3.6 | Guard saves/restores device+stream on scope exit | Both | 3 | `[ ]` | |
+
+---
+
+## 4. Autoload **[PU1]** -- Rank: **3**
+
+| # | Item | Pts | Status | Notes |
+|---|------|-----|--------|-------|
+| 4.1 | `entry_points` registered in `setup.py`/`pyproject.toml` (group: `torch.backends`) | 2 | `[ ]` | |
+| 4.2 | `_autoload()` callable initializes backend on `import torch` | 2 | `[ ]` | |
+| 4.3 | `torch.device("<name>")` resolves without explicit import of backend package | 2 | `[ ]` | |
+
+---
+
+## 5. Memory & Allocator -- Rank: **1**
+
+| # | Item | Pts | Status | Notes |
+|---|------|-----|--------|-------|
+| 5.1 | Device allocator (`c10::Allocator` subclass) | 3 | `[ ]` | |
+| 5.2 | Host/pinned memory allocator | 2 | `[ ]` | |
+| 5.3 | Allocator registered globally | 3 | `[ ]` | |
+| 5.4 | `torch.<name>.memory_allocated()` | 2 | `[ ]` | |
+| 5.5 | `torch.<name>.max_memory_allocated()` | 1 | `[ ]` | |
+| 5.6 | `torch.<name>.memory_reserved()` (if caching allocator) | 1 | `[ ]` | |
+| 5.7 | `torch.<name>.empty_cache()` | 2 | `[ ]` | |
+| 5.8 | `memory_summary()` or equivalent | 1 | `[ ]` | |
+| 5.9 | OOM produces a clear error message (not a segfault) | 2 | `[ ]` | |
+| 5.10 | Pinned memory (`pin_memory=True` in DataLoader) | 2 | `[ ]` | |
+
+---
+
+## 6. Streams & Events -- Rank: **3**
+
+| # | Item | Pts | Status | Notes |
+|---|------|-----|--------|-------|
+| 6.1 | Stream implementation (pool management, priority support) | 2 | `[ ]` | |
+| 6.2 | `torch.<name>.Stream` class functional | 2 | `[ ]` | |
+| 6.3 | `torch.<name>.current_stream()` / `set_stream()` | 2 | `[ ]` | |
+| 6.4 | `stream.synchronize()` | 2 | `[ ]` | |
+| 6.5 | `stream.wait_stream(other)` | 1 | `[ ]` | |
+| 6.6 | Event creation and recording | 2 | `[ ]` | |
+| 6.7 | `event.wait()` / `event.synchronize()` | 1 | `[ ]` | |
+| 6.8 | `event.elapsed_time(end_event)` | 1 | `[ ]` | |
+| 6.9 | Non-blocking H2D/D2H transfer with stream overlap | 2 | `[ ]` | |
+
+---
+
+## 7. RNG & Generator -- Rank: **3**
+
+| # | Item | Path | Pts | Status | Notes |
+|---|------|------|-----|--------|-------|
+| 7.1 | Custom `at::Generator` subclass | Both | 3 | `[ ]` | |
+| 7.2 | Registered via `REGISTER_GENERATOR_PRIVATEUSE1(GeneratorClass)` | PU1 | 2 | `[ ]` | |
+| 7.3 | `torch.<name>.manual_seed(seed)` | Both | 2 | `[ ]` | |
+| 7.4 | `torch.<name>.initial_seed()` | Both | 1 | `[ ]` | |
+| 7.5 | Generator fork safety (fork handler registered) | Both | 2 | `[ ]` | |
+| 7.6 | `torch.Generator(device='<name>')` works | Both | 2 | `[ ]` | |
+| 7.7 | `get_rng_state()` / `set_rng_state()` for checkpointing | Both | 2 | `[ ]` | |
+| 7.8 | `torch.use_deterministic_algorithms(True)` respected | Both | 1 | `[ ]` | |
+
+---
+
+## 8. Operator Registration -- Rank: **1**
+
+### 8.1 Minimal Kernel Set
+
+| # | Item | Pts | Status | Notes |
+|---|------|-----|--------|-------|
+| 8.1.1 | `empty.memory_format` -- tensor factory | 3 | `[ ]` | |
+| 8.1.2 | `_copy_from` / `_copy_from_and_resize` -- device<->CPU | 3 | `[ ]` | |
+| 8.1.3 | `_local_scalar_dense` -- scalar extraction (`.item()`) | 3 | `[ ]` | |
+| 8.1.4 | Tensor creation ops (`torch.zeros`, `ones`, `randn`, `full`, `arange`, `linspace`) | 3 | `[ ]` | |
+
+### 8.2 Extended Operator Coverage
+
+| Category | Example Ops | Pts | Status | Pass/Total | Notes |
+|----------|-------------|-----|--------|------------|-------|
+| Elementwise unary | `abs`, `neg`, `exp`, `log`, `sqrt`, `sin`, `cos`, `tanh`, `sigmoid`, `relu`, `gelu`, `silu` | 3 | `[ ]` | | |
+| Elementwise binary | `add`, `sub`, `mul`, `div`, `remainder`, `pow`, `maximum`, `minimum` | 3 | `[ ]` | | |
+| Comparison | `eq`, `ne`, `lt`, `gt`, `le`, `ge` | 2 | `[ ]` | | |
+| Reduction | `sum`, `mean`, `max`, `min`, `argmax`, `argmin`, `any`, `all`, `prod` | 3 | `[ ]` | | |
+| Linear algebra | `mm`, `bmm`, `addmm`, `matmul`, `linear`, `einsum` | 3 | `[ ]` | | |
+| Convolution | `conv1d`, `conv2d`, `conv3d`, `conv_transpose2d` | 2 | `[ ]` | | |
+| Pooling | `max_pool2d`, `avg_pool2d`, `adaptive_avg_pool2d` | 2 | `[ ]` | | |
+| Normalization | `batch_norm`, `layer_norm`, `group_norm`, `instance_norm` | 3 | `[ ]` | | |
+| Activation | `relu`, `gelu`, `silu`, `sigmoid`, `softmax`, `log_softmax` | 3 | `[ ]` | | |
+| Attention | `scaled_dot_product_attention` | 3 | `[ ]` | | |
+| Indexing | `index`, `index_put`, `index_select`, `gather`, `scatter`, `masked_fill` | 2 | `[ ]` | | |
+| Shape ops | `reshape`, `view`, `permute`, `transpose`, `contiguous`, `cat`, `stack`, `chunk`, `split`, `unsqueeze`, `squeeze`, `expand`, `repeat` | 2 | `[ ]` | | |
+| Memory ops | `clone`, `copy_`, `fill_`, `zero_`, `empty_like`, `zeros_like` | 3 | `[ ]` | | |
+| Random | `uniform_`, `normal_`, `bernoulli_`, `dropout`, `rand`, `randn` | 2 | `[ ]` | | |
+| Embedding | `embedding`, `embedding_bag` | 2 | `[ ]` | | |
+| Loss functions | `cross_entropy`, `mse_loss`, `nll_loss`, `binary_cross_entropy_with_logits` | 2 | `[ ]` | | |
+| Sorting | `sort`, `topk`, `argsort` | 1 | `[ ]` | | |
+| Type casting | `to(dtype)`, `float()`, `half()`, `bfloat16()`, `int()`, `bool()` | 2 | `[ ]` | | |
+
+### 8.3 Model-Level Validation
+
+| Model | Framework | Pts | Status | Notes |
+|-------|-----------|-----|--------|-------|
+| ResNet-50 | torchvision | 2 | `[ ]` | |
+| BERT-base | HuggingFace transformers | 2 | `[ ]` | |
+| GPT-2 | HuggingFace transformers | 2 | `[ ]` | |
+| Llama-2-7B (inference) | HuggingFace transformers | 3 | `[ ]` | |
+| Vision Transformer (ViT) | torchvision / timm | 1 | `[ ]` | |
+| Stable Diffusion (UNet) | diffusers | 1 | `[ ]` | |
+| Whisper | HuggingFace transformers | 1 | `[ ]` | |
+| T5 | HuggingFace transformers | 1 | `[ ]` | |
+
+For each: forward pass / backward pass / numerics match CUDA (within tolerance)
+
+### 8.4 Fallback Mechanisms
+
+| # | Item | Path | Pts | Status | Notes |
+|---|------|------|-----|--------|-------|
+| 8.4.1 | Per-operator CPU fallback (device->CPU->compute->device) | Both | 2 | `[ ]` | |
+| 8.4.2 | Global fallback via `torch::Library::fallback()` | Both | 2 | `[ ]` | |
+| 8.4.3 | Fallthrough registration for metadata/shape-only dispatch | Both | 1 | `[ ]` | |
+| 8.4.4 | `Autograd<Key>` fallback for autograd | Both | 3 | `[ ]` | |
+
+### 8.5 Custom Operators
+
+| # | Item | Pts | Status | Notes |
+|---|------|-----|--------|-------|
+| 8.5.1 | `TORCH_LIBRARY(<ns>, m)` schema registration | 2 | `[ ]` | |
+| 8.5.2 | Kernel implementation + dispatch registration | 2 | `[ ]` | |
+| 8.5.3 | Meta (shape-inference) kernel for torch.compile | 2 | `[ ]` | |
+| 8.5.4 | `torch.autograd.Function` for custom backward | 2 | `[ ]` | |
+
+---
+
+## 9. Python Frontend & Device-Agnostic APIs -- Rank: **2**
+
+| # | Item | Path | Pts | Status | Notes |
+|---|------|------|-----|--------|-------|
+| 9.1 | `torch.<name>.is_available()` | Both | 3 | `[ ]` | |
+| 9.2 | `torch.<name>.device_count()` | Both | 2 | `[ ]` | |
+| 9.3 | `torch.<name>.synchronize()` | Both | 2 | `[ ]` | |
+| 9.4 | `torch.accelerator.current_device()` | Both | 2 | `[ ]` | |
+| 9.5 | `torch.accelerator.device_count()` | Both | 1 | `[ ]` | |
+| 9.6 | `torch.accelerator.is_available()` | Both | 1 | `[ ]` | |
+| 9.7 | `torch.accelerator.synchronize()` | Both | 1 | `[ ]` | |
+| 9.8 | `torch.accelerator.current_stream()` / `set_stream()` | Both | 1 | `[ ]` | |
+| 9.9 | `Tensor.to(device)` / `Tensor.<name>()` / `Tensor.is_<name>` | Both | 3 | `[ ]` | |
+| 9.10 | `nn.Module.to(device)` | Both | 3 | `[ ]` | |
+
+---
+
+## 10. Autograd (Training Support) -- Rank: **1**
+
+| # | Item | Path | Pts | Status | Notes |
+|---|------|------|-----|--------|-------|
+| 10.1 | Dispatch key has corresponding `Autograd<Key>` registered | Both | 3 | `[ ]` | |
+| 10.2 | `.backward()` completes on a simple loss | Both | 3 | `[ ]` | |
+| 10.3 | `torch.autograd.grad()` works | Both | 2 | `[ ]` | |
+| 10.4 | Gradient accumulation (`.backward()` multiple times) | Both | 2 | `[ ]` | |
+| 10.5 | `torch.autograd.Function` custom forward/backward on device | Both | 2 | `[ ]` | |
+| 10.6 | Gradient checkpointing (`torch.utils.checkpoint.checkpoint`) | Both | 2 | `[ ]` | |
+| 10.7 | Gradients match CUDA numerically (within tolerance) | Both | 3 | `[ ]` | |
+| 10.8 | Mixed precision backward (fp16/bf16 forward, fp32 grad) | Both | 2 | `[ ]` | |
+| 10.9 | Higher-order gradients (if needed) | Both | 1 | `[ ]` | |
+
+---
+
+## 11. Automatic Mixed Precision (AMP) -- Rank: **2**
+
+| # | Item | Path | Pts | Status | Notes |
+|---|------|------|-----|--------|-------|
+| 11.1 | `Autocast<Key>` dispatch key kernels registered | Both | 3 | `[ ]` | |
+| 11.2 | `get_amp_supported_dtype()` returns supported dtypes | Both | 2 | `[ ]` | |
+| 11.3 | `torch.autocast(device_type="<name>")` works | Both | 3 | `[ ]` | |
+| 11.4 | Ops correctly cast to lower precision inside autocast | Both | 2 | `[ ]` | |
+| 11.5 | Ops that need fp32 (softmax, layer_norm, loss) stay in fp32 | Both | 2 | `[ ]` | |
+| 11.6 | `torch.amp.GradScaler("<name>")` works (if needed) | Both | 2 | `[ ]` | |
+| 11.7 | Training loop with AMP converges (loss decreases) | Both | 3 | `[ ]` | |
+
+---
+
+## 12. torch.compile / Inductor -- Rank: **2**
+
+| # | Item | Path | Pts | Status | Notes |
+|---|------|------|-----|--------|-------|
+| 12.1 | `DeviceInterface` subclass implemented | Both | 3 | `[ ]` | |
+| 12.2 | Registered via `register_interface_for_device("<name>", Interface)` | Both | 3 | `[ ]` | |
+| 12.3 | `torch.compile(model)` does not error on a simple model | Both | 3 | `[ ]` | |
+| 12.4 | Compiled model produces correct output | Both | 3 | `[ ]` | |
+| 12.5 | No unexpected graph breaks on standard models | Both | 2 | `[ ]` | |
+| 12.6 | `torch.compile(model, mode="reduce-overhead")` works | Both | 1 | `[ ]` | |
+| 12.7 | FakeTensor / meta tensor support for device | Both | 2 | `[ ]` | |
+| 12.8 | Custom Inductor codegen registered (if applicable) | Both | 1 | `[ ]` | |
+| 12.9 | AOTInductor export works (if targeting inference deployment) | Both | 1 | `[ ]` | |
+
+---
+
+## 13. Serialization & Model Portability -- Rank: **2**
+
+| # | Item | Path | Pts | Status | Notes |
+|---|------|------|-----|--------|-------|
+| 13.1 | `TensorBackendMetaRegistry` registered for save/load | PU1 | 3 | `[ ]` | |
+| 13.2 | `torch.save(model.state_dict())` works with device tensors | Both | 3 | `[ ]` | |
+| 13.3 | `torch.load(..., map_location="<name>")` works | Both | 3 | `[ ]` | |
+| 13.4 | Load a state_dict saved on CUDA onto your device | Both | 3 | `[ ]` | |
+| 13.5 | Load a state_dict saved on your device onto CPU | Both | 2 | `[ ]` | |
+| 13.6 | `torch.load(..., weights_only=True)` works | Both | 2 | `[ ]` | |
+| 13.7 | `safetensors` load/save (if supported by ecosystem) | Both | 1 | `[ ]` | |
+
+---
+
+## 14. Distributed Training -- Rank: **2**
+
+| # | Item | Path | Pts | Status | Notes |
+|---|------|------|-----|--------|-------|
+| 14.1 | Custom `ProcessGroup` subclass implemented | Both | 3 | `[ ]` | |
+| 14.2 | Registered via `torch.distributed.Backend.register_backend()` | Both | 3 | `[ ]` | |
+| 14.3 | `init_process_group(backend="<name>")` works | Both | 3 | `[ ]` | |
+
+### Collective Operations
+
+| Collective | Pts | Status | Multi-node | Notes |
+|-----------|-----|--------|------------|-------|
+| `all_reduce` | 3 | `[ ]` | `[ ]` | |
+| `broadcast` | 3 | `[ ]` | `[ ]` | |
+| `all_gather` | 2 | `[ ]` | `[ ]` | |
+| `reduce_scatter` | 2 | `[ ]` | `[ ]` | |
+| `barrier` | 2 | `[ ]` | `[ ]` | |
+| `send` / `recv` (P2P) | 1 | `[ ]` | `[ ]` | |
+| `all_to_all` | 1 | `[ ]` | `[ ]` | |
+
+### Distributed Strategies
+
+| # | Item | Pts | Status | Notes |
+|---|------|-----|--------|-------|
+| 14.4 | DDP training (2+ devices, loss converges) | 3 | `[ ]` | |
+| 14.5 | FSDP training | 2 | `[ ]` | |
+| 14.6 | Tensor Parallel | 2 | `[ ]` | |
+| 14.7 | Pipeline Parallel | 1 | `[ ]` | |
+| 14.8 | `DeviceMesh` works | 1 | `[ ]` | |
+| 14.9 | Multi-node training (2+ nodes) | 2 | `[ ]` | |
+
+---
+
+## 15. Profiler -- Rank: **3**
+
+| # | Item | Path | Pts | Status | Notes |
+|---|------|------|-----|--------|-------|
+| 15.1 | `ProfilerStubs` registered (operator-level timing) | PU1 | 2 | `[ ]` | |
+| 15.2 | `torch.profiler.profile` collects device traces | Both | 2 | `[ ]` | |
+| 15.3 | Kernel-level timing visible | Both | 2 | `[ ]` | |
+| 15.4 | Kineto `IActivityProfiler` plugin | PU1 | 1 | `[ ]` | |
+| 15.5 | Correlation-ID plumbing for kernel/op linking | Both | 1 | `[ ]` | |
+| 15.6 | Traces viewable in TensorBoard / Chrome tracing | Both | 1 | `[ ]` | |
+| 15.7 | Memory profiling | Both | 1 | `[ ]` | |
+
+---
+
+## 16. DataLoader Integration -- Rank: **3**
+
+| # | Item | Pts | Status | Notes |
+|---|------|-----|--------|-------|
+| 16.1 | `DataLoader(pin_memory=True)` works | 2 | `[ ]` | |
+| 16.2 | `tensor.to(device, non_blocking=True)` overlaps with compute | 2 | `[ ]` | |
+| 16.3 | Multi-worker DataLoader doesn't deadlock with device | 2 | `[ ]` | |
+
+---
+
+## 17. Future / In-Progress Modules -- Rank: **3**
+
+| # | Item | Pts | Status | Notes |
+|---|------|-----|--------|-------|
+| 17.1 | Quantization -- quantized dtype support and op kernels | 2 | `[ ]` | |
+| 17.2 | ONNX Export -- `torch.onnx.export` with device tensors | 1 | `[ ]` | |
+| 17.3 | Tensor/Storage Customization | 1 | `[ ]` | |
+
+---
+
+## 18. Testing & Validation -- Rank: **2**
+
+### 18.1 Device-Generic Test Framework
+
+| # | Item | Path | Pts | Status | Notes |
+|---|------|------|-----|--------|-------|
+| 18.1.1 | `instantiate_device_type_tests` runs on your device | PU1 | 2 | `[ ]` | |
+| 18.1.2 | `PrivateUse1TestBase` auto-included in test framework | PU1 | 2 | `[ ]` | |
+| 18.1.3 | OpInfo-based operator compliance tests pass | Both | 3 | `[ ]` | |
+| 18.1.4 | Common device dtype tests pass | Both | 2 | `[ ]` | |
+
+### 18.2 Module-Level Tests
+
+| Test Area | Pts | Status | Notes |
+|-----------|-----|--------|-------|
+| Tensor creation & transfer | 2 | `[ ]` | |
+| Stream correctness | 1 | `[ ]` | |
+| Event correctness | 1 | `[ ]` | |
+| Memory allocation & cleanup | 2 | `[ ]` | |
+| Storage operations | 1 | `[ ]` | |
+| RNG reproducibility | 1 | `[ ]` | |
+| AMP / autocast | 2 | `[ ]` | |
+| Backward pass / autograd | 2 | `[ ]` | |
+| torch.compile correctness | 2 | `[ ]` | |
+| Distributed collectives | 2 | `[ ]` | |
+| Profiler output | 1 | `[ ]` | |
+| Operator coverage | 2 | `[ ]` | |
+| Serialization round-trip | 1 | `[ ]` | |
+
+### 18.3 CI Integration
+
+| # | Item | Pts | Status | Notes |
+|---|------|-----|--------|-------|
+| 18.3.1 | CI pipeline runs device-generic test suite | 2 | `[ ]` | |
+| 18.3.2 | Regression tests on each upstream PyTorch update | 2 | `[ ]` | |
+| 18.3.3 | Integration with `pytorch-integration-tests` framework | 1 | `[ ]` | |
+
+---
+
+## 19. Dtype Support Matrix -- Rank: **2**
+
+| Dtype | Pts | Compute | Storage | AMP Target | CUDA Parity | Notes |
+|-------|-----|---------|---------|------------|-------------|-------|
+| `float16` | 3 | `[ ]` | `[ ]` | `[ ]` | `[ ]` | |
+| `bfloat16` | 3 | `[ ]` | `[ ]` | `[ ]` | `[ ]` | |
+| `float32` | 3 | `[ ]` | `[ ]` | -- | `[ ]` | |
+| `float64` | 1 | `[ ]` | `[ ]` | -- | `[ ]` | |
+| `int8` | 2 | `[ ]` | `[ ]` | -- | `[ ]` | |
+| `int16` | 1 | `[ ]` | `[ ]` | -- | `[ ]` | |
+| `int32` | 2 | `[ ]` | `[ ]` | -- | `[ ]` | |
+| `int64` | 2 | `[ ]` | `[ ]` | -- | `[ ]` | |
+| `uint8` | 1 | `[ ]` | `[ ]` | -- | `[ ]` | |
+| `bool` | 2 | `[ ]` | `[ ]` | -- | `[ ]` | |
+| `complex64` | 1 | `[ ]` | `[ ]` | -- | `[ ]` | |
+| `complex128` | 1 | `[ ]` | `[ ]` | -- | `[ ]` | |
+| `float8_e4m3fn` | 1 | `[ ]` | `[ ]` | -- | `[ ]` | |
+| `float8_e5m2` | 1 | `[ ]` | `[ ]` | -- | `[ ]` | |
+
+---
+
+## 20. Numerical Accuracy -- Rank: **2**
+
+| # | Item | Pts | Status | Notes |
+|---|------|-----|--------|-------|
+| 20.1 | float32 ops match CUDA within 1e-5 atol | 3 | `[ ]` | |
+| 20.2 | float16 ops match CUDA within 1e-3 atol | 3 | `[ ]` | |
+| 20.3 | bfloat16 ops match CUDA within 1e-2 atol | 2 | `[ ]` | |
+| 20.4 | Reduction ops handle large tensors without overflow | 2 | `[ ]` | |
+| 20.5 | Matmul results are deterministic (same input -> same output) | 2 | `[ ]` | |
+| 20.6 | Loss convergence curve matches CUDA on reference models | 3 | `[ ]` | |
+
+---
+
+## 21. Device Behavior Parity with CUDA -- Rank: **3**
+
+| # | Item | Pts | Status | Notes |
+|---|------|-----|--------|-------|
+| 21.1 | Default stream behavior matches CUDA (ops are async) | 2 | `[ ]` | |
+| 21.2 | `synchronize()` semantics match CUDA | 2 | `[ ]` | |
+| 21.3 | `non_blocking=True` behavior matches CUDA | 2 | `[ ]` | |
+| 21.4 | Tensor storage layout matches (contiguous, stride semantics) | 2 | `[ ]` | |
+| 21.5 | In-place op behavior matches (aliasing, grad implications) | 1 | `[ ]` | |
+| 21.6 | `.is_contiguous()` is correct | 2 | `[ ]` | |
+| 21.7 | Error messages reference correct device name (not "CUDA") | 1 | `[ ]` | |
+
+---
+
+## 22. Ecosystem Compatibility -- Rank: **3**
+
+| Library | Pts | Status | Version Tested | Notes |
+|---------|-----|--------|----------------|-------|
+| HuggingFace transformers | 3 | `[ ]` | | |
+| HuggingFace accelerate | 2 | `[ ]` | | |
+| DeepSpeed | 2 | `[ ]` | | |
+| Megatron-LM | 1 | `[ ]` | | |
+| torchvision | 2 | `[ ]` | | |
+| torchaudio | 1 | `[ ]` | | |
+| torchtune | 1 | `[ ]` | | |
+| PEFT (LoRA, QLoRA) | 2 | `[ ]` | | |
+| bitsandbytes | 1 | `[ ]` | | |
+| Flash Attention | 2 | `[ ]` | | |
+| triton (if applicable) | 2 | `[ ]` | | |
+| vLLM / TGI (inference) | 2 | `[ ]` | | |
+
+---
+
+## 23. Registration API Quick Reference
+
+### PrivateUse1 Path
+
+| What | API / Macro | When |
+|------|-------------|------|
+| Backend name | `torch.utils.rename_privateuse1_backend("<name>")` | Python init |
+| Device module | `torch._register_device_module("<name>", mod)` | Python init |
+| Method generation | `generate_methods_for_privateuse1_backend("<name>")` | Python init |
+| Hooks | `RegisterPrivateUse1HooksInterface(hooks_ptr)` | C++ static init |
+| Guard | `C10_REGISTER_GUARD_IMPL(PrivateUse1, GuardClass)` | C++ static init |
+| Generator | `REGISTER_GENERATOR_PRIVATEUSE1(GenClass)` | C++ static init |
+| Kernels | `TORCH_LIBRARY_IMPL(aten, PrivateUse1, m)` | C++ per-op |
+| Autograd | `TORCH_LIBRARY_IMPL(aten, AutogradPrivateUse1, m)` | C++ per-op |
+| AMP | `TORCH_LIBRARY_IMPL(aten, AutocastPrivateUse1, m)` | C++ per-op |
+| Serialization | `TensorBackendMetaRegistry(PrivateUse1, ...)` | C++ static init |
+| Profiler | `REGISTER_PRIVATEUSE1_PROFILER(StubClass)` | C++ static init |
+| ProcessGroup | `torch.distributed.Backend.register_backend(...)` | Python init |
+| torch.compile | `register_interface_for_device("<name>", DevInterface)` | Python init |
+| Autoload | `entry_points = {"torch.backends": ["<name> = ..."]}` | setup.py |
+
+### Fork Path
+
+| What | API / Mechanism | Where |
+|------|----------------|-------|
+| Device type | Add to `c10::DeviceType` enum | `c10/core/DeviceType.h` |
+| Dispatch key | Add to `DispatchKey` enum | `c10/core/DispatchKey.h` |
+| Guard | `C10_REGISTER_GUARD_IMPL(<Key>, GuardClass)` | C++ static init |
+| Kernels | `TORCH_LIBRARY_IMPL(aten, <Key>, m)` | C++ per-op |
+| Autograd | `TORCH_LIBRARY_IMPL(aten, Autograd<Key>, m)` | C++ per-op |
+| AMP | `TORCH_LIBRARY_IMPL(aten, Autocast<Key>, m)` | C++ per-op |
+| native_functions | Add dispatch entries to `native_functions.yaml` | ATen codegen |
+
+---
+
+## Sources
+
+- [Accelerator Integration Guide][accel-guide]
+- [OpenReg Reference Implementation][openreg]
+- [Tracking Issue #158917][issue]
+- [PrivateUse1 Tutorial][pu1-tutorial]
+- [PyTorch Multi-Device Blog Post][blog]
+- [ProcessGroup Extension Tutorial][pg-tutorial]
+- [Running and Writing Tests Wiki][tests-wiki]
+- [Accelerator Integration Working Group][accel-wg]
+
+[accel-guide]: https://docs.pytorch.org/docs/stable/accelerator/index.html
+[openreg]: https://github.com/pytorch/pytorch/tree/main/test/cpp_extensions/open_registration_extension/torch_openreg
+[issue]: https://github.com/pytorch/pytorch/issues/158917
+[pu1-tutorial]: https://docs.pytorch.org/tutorials/advanced/privateuseone.html
+[blog]: https://pytorch.org/blog/pt-multidevice-integration/
+[pg-tutorial]: https://docs.pytorch.org/tutorials/intermediate/process_group_cpp_extension_tutorial.html
+[tests-wiki]: https://github.com/pytorch/pytorch/wiki/Running-and-writing-tests
+[accel-wg]: https://github.com/pytorch-fdn/accelerator-integration-wg
+[pit]: https://github.com/cosdt/pytorch-integration-tests
