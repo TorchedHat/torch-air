@@ -8,16 +8,17 @@
 > Items marked with **[Fork]** apply only to fork-based backends.
 > Unmarked items apply to **both** paths.
 
-**Backend under evaluation**: _[FILL: backend name]_
-**Integration path**: _[FILL: auto-detected by agent]_
-**Dispatch key**: _[FILL: auto-detected by agent]_
-**Evaluation date**: _[FILL: date]_
-**Evaluator**: _[FILL: human or agent]_
-**Fork base** (if fork): _[FILL: auto-detected by agent]_
+| Field | Value |
+|-------|-------|
+| **Backend** | _[FILL: backend name]_ |
+| **Integration path** | _[FILL: PU1 or Fork]_ |
+| **Dispatch key** | _[FILL: PrivateUse1 or custom]_ |
+| **Evaluation date** | _[FILL: date]_ |
+| **Evaluator** | _[FILL: human or agent]_ |
+| **Source** | _[FILL: repo URL]_ |
+| **PyTorch base** | _[FILL: version]_ |
+| **Fork base** | _[FILL: version/commit, or omit row for PU1]_ |
 
-**Status markers**: `[ ]` Not Ready | `[~]` Partially Ready | `[x]` Ready | `[N/A]` Not applicable
-
-**Maturity levels**: Not Started | Prototype | Alpha | Beta | Production
 
 ---
 
@@ -26,7 +27,10 @@
 ### Executive Summary
 
 _[FILL: Write a concise summary covering:
-- **Overall verdict** and score (X.X / 10)
+- **Overall Readiness**: X% (weighted: Y%)
+- **Notable insights**:
+  - Surprising finding or important context 1
+  - Surprising finding or important context 2
 - **Key strengths**:
   - Top strength 1
   - Top strength 2
@@ -35,13 +39,7 @@ _[FILL: Write a concise summary covering:
   - Critical gap 1
   - Critical gap 2
   - Critical gap 3
-- **Key next steps**:
-  - Highest-impact action 1
-  - Highest-impact action 2
-  - Highest-impact action 3
-- **Notable insights**:
-  - Surprising finding or important context 1
-  - Surprising finding or important context 2]_
+- **Upstream candidates**: N features identified as generic enough for PyTorch core (see below)]_
 
 ### Scoring Model
 
@@ -50,39 +48,31 @@ Each row has a **point value** (1-3) reflecting its importance:
 - **2 pts** = Important (expected for production use)
 - **1 pt** = Nice-to-have (polish, edge cases)
 
-Each section has a **rank** (1-3) reflecting its tier:
-- **Rank 1** = Foundational (blocks basic functionality)
-- **Rank 2** = Core Production (expected for production use)
-- **Rank 3** = Quality of Life (polish, ecosystem, sustainability)
+Each section has a **level** (1-3). Level 1 sections are weighted highest.
 
 **Row scoring**: `[x]` = full points, `[~]` = half points, `[ ]` = 0, `[N/A]` = excluded from max
 
-**Section score**: `section_pct = earned_pts / max_pts` (percentage only, no multiplication by rank)
+**Section score**: `section_pct = earned_pts / max_pts`
 
 **Overall score formula**:
 ```
-weight_r = 1 / rank
-Overall Score = (sum(section_pct * weight_r) / sum(weight_r)) * 10
+weight_r = 1 / level
+Readiness = (sum(section_pct * weight_r) / sum(weight_r)) * 100
 ```
 where the sums are over all applicable sections (excluding fully N/A sections).
 
-**Readiness verdict**:
-- **0 - 4** = Not Ready
-- **4 - 7** = Partially Ready
-- **7 - 10** = Ready
-
 ### Section Scores
 
-| Section | Rank | Max Pts | Earned | Pct | Weighted |
+| Section | Level | Max Pts | Earned | Pct | Weighted |
 |---------|------|---------|--------|-----|----------|
-| **Rank 1 -- Foundational** | | | | | |
+| **Level 1** | | | | | |
 | Device Registration & Management | 1 | | | | |
 | Operator Registration | 1 | | | | |
 | Autograd | 1 | | | | |
 | Device Guard | 1 | | | | |
 | Accelerator Hooks [PU1] | 1 | | | | |
 | Memory & Allocator | 1 | | | | |
-| **Rank 2 -- Core Production** | | | | | |
+| **Level 2** | | | | | |
 | Serialization & Model Portability | 2 | | | | |
 | Python Frontend & Device-Agnostic APIs | 2 | | | | |
 | AMP | 2 | | | | |
@@ -91,50 +81,79 @@ where the sums are over all applicable sections (excluding fully N/A sections).
 | Dtype Support Matrix | 2 | | | | |
 | Numerical Accuracy | 2 | | | | |
 | Testing & Validation | 2 | | | | |
-| **Rank 3 -- Quality of Life** | | | | | |
+| **Level 3** | | | | | |
 | Streams & Events | 3 | | | | |
 | RNG & Generator | 3 | | | | |
 | Autoload [PU1] | 3 | | | | |
 | DataLoader Integration | 3 | | | | |
-| Device Behavior Parity with CUDA | 3 | | | | |
 | Profiler | 3 | | | | |
 | Ecosystem Compatibility | 3 | | | | |
-| Future / In-Progress Modules | 3 | | | | |
+| Additional PyTorch APIs | 3 | | | | |
 | **TOTAL** | | | | | |
 
 ### Calculation
 
 ```
 Section Pct = earned_pts / max_pts (excluding N/A rows)
-weight_r = 1 / rank
-Weighted = Pct * (1 / rank)
-Overall Score = (sum(Weighted) / sum(weight_r for applicable sections)) * 10
+weight_r = 1 / level
+Weighted = Pct * (1 / level)
+Readiness = (sum(Weighted) / sum(weight_r for applicable sections)) * 100
 ```
 
-### Final Verdict
+**Readiness**: _____ %
 
-| Score | Verdict |
-|-------|---------|
-| 0 - 4 | **Not Ready** |
-| 4 - 7 | **Partially Ready** |
-| 7 - 10 | **Ready** |
+### Upstream Candidates (Advisory)
 
-**Overall Score**: _____ / 10
-**Verdict**: _____
+> Features discovered in this backend that are generic enough to benefit
+> all PU1/accelerator backends if upstreamed to PyTorch core.
+> Advisory only -- does not affect the readiness score.
 
-### Summary
+**Classification key**:
+- **Generic** -- no backend-specific references; could be copy-pasted into `torch/accelerator/` and work for any PU1 backend
+- **Needs Abstraction** -- solves a problem every backend faces, but implementation references backend-specific internals; upstream path is to define an interface/hook in core
+- **Hardware-Specific** -- solves a problem unique to this hardware; other backends would never need it
 
-_[FILL: Write as bullet points:
-- **Score**: X.X/10 (Verdict)
-- **Production-quality areas**: List fully implemented areas
-- **Operator coverage**: Op count and categories
-- **Gaps**:
-  - Gap 1
-  - Gap 2
-- **Next steps**:
-  - Action 1
-  - Action 2
-- **Character**: One line on backend's focus and approach]_
+#### CPU Fallback Infrastructure
+
+| # | Feature | Classification | Evidence | Upstream Notes |
+|---|---------|---------------|----------|----------------|
+| 1 | _[FILL]_ | | | |
+
+#### Profiler / Explain Framework
+
+| # | Feature | Classification | Evidence | Upstream Notes |
+|---|---------|---------------|----------|----------------|
+| 1 | _[FILL]_ | | | |
+
+#### View-Aware Dispatch
+
+| # | Feature | Classification | Evidence | Upstream Notes |
+|---|---------|---------------|----------|----------------|
+| 1 | _[FILL]_ | | | |
+
+#### Memory Management Patterns
+
+| # | Feature | Classification | Evidence | Upstream Notes |
+|---|---------|---------------|----------|----------------|
+| 1 | _[FILL]_ | | | |
+
+#### Device Topology & Utilities
+
+| # | Feature | Classification | Evidence | Upstream Notes |
+|---|---------|---------------|----------|----------------|
+| 1 | _[FILL]_ | | | |
+
+#### Compile Integration Patterns
+
+| # | Feature | Classification | Evidence | Upstream Notes |
+|---|---------|---------------|----------|----------------|
+| 1 | _[FILL]_ | | | |
+
+#### New Hooks / API Extensions
+
+| # | Feature | Classification | Evidence | Upstream Notes |
+|---|---------|---------------|----------|----------------|
+| 1 | _[FILL]_ | | | |
 
 ---
 
@@ -208,7 +227,7 @@ Once detected, the agent should:
 
 ---
 
-## 1. Device Registration & Management -- Rank: **1**
+## 1. Device Registration & Management -- Level: **1**
 
 ### 1.1 Backend Registration
 
@@ -235,7 +254,7 @@ Once detected, the agent should:
 
 ---
 
-## 2. Accelerator Hooks **[PU1]** -- Rank: **1**
+## 2. Accelerator Hooks **[PU1]** -- Level: **1**
 
 ### Mandatory hooks (throw if not overridden)
 
@@ -264,7 +283,7 @@ Once detected, the agent should:
 
 ---
 
-## 3. Device Guard -- Rank: **1**
+## 3. Device Guard -- Level: **1**
 
 | # | Item | Path | Pts | Status | Notes |
 |---|------|------|-----|--------|-------|
@@ -277,7 +296,7 @@ Once detected, the agent should:
 
 ---
 
-## 4. Autoload **[PU1]** -- Rank: **3**
+## 4. Autoload **[PU1]** -- Level: **3**
 
 | # | Item | Pts | Status | Notes |
 |---|------|-----|--------|-------|
@@ -287,7 +306,7 @@ Once detected, the agent should:
 
 ---
 
-## 5. Memory & Allocator -- Rank: **1**
+## 5. Memory & Allocator -- Level: **1**
 
 | # | Item | Pts | Status | Notes |
 |---|------|-----|--------|-------|
@@ -304,7 +323,7 @@ Once detected, the agent should:
 
 ---
 
-## 6. Streams & Events -- Rank: **3**
+## 6. Streams & Events -- Level: **3**
 
 | # | Item | Pts | Status | Notes |
 |---|------|-----|--------|-------|
@@ -320,7 +339,7 @@ Once detected, the agent should:
 
 ---
 
-## 7. RNG & Generator -- Rank: **3**
+## 7. RNG & Generator -- Level: **3**
 
 | # | Item | Path | Pts | Status | Notes |
 |---|------|------|-----|--------|-------|
@@ -335,7 +354,7 @@ Once detected, the agent should:
 
 ---
 
-## 8. Operator Registration -- Rank: **1**
+## 8. Operator Registration -- Level: **1**
 
 ### 8.1 Minimal Kernel Set
 
@@ -404,7 +423,7 @@ For each: forward pass / backward pass / numerics match CUDA (within tolerance)
 
 ---
 
-## 9. Python Frontend & Device-Agnostic APIs -- Rank: **2**
+## 9. Python Frontend & Device-Agnostic APIs -- Level: **2**
 
 | # | Item | Path | Pts | Status | Notes |
 |---|------|------|-----|--------|-------|
@@ -421,7 +440,7 @@ For each: forward pass / backward pass / numerics match CUDA (within tolerance)
 
 ---
 
-## 10. Autograd (Training Support) -- Rank: **1**
+## 10. Autograd (Training Support) -- Level: **1**
 
 | # | Item | Path | Pts | Status | Notes |
 |---|------|------|-----|--------|-------|
@@ -437,7 +456,7 @@ For each: forward pass / backward pass / numerics match CUDA (within tolerance)
 
 ---
 
-## 11. Automatic Mixed Precision (AMP) -- Rank: **2**
+## 11. Automatic Mixed Precision (AMP) -- Level: **2**
 
 | # | Item | Path | Pts | Status | Notes |
 |---|------|------|-----|--------|-------|
@@ -451,7 +470,7 @@ For each: forward pass / backward pass / numerics match CUDA (within tolerance)
 
 ---
 
-## 12. torch.compile / Inductor -- Rank: **2**
+## 12. torch.compile / Inductor -- Level: **2**
 
 | # | Item | Path | Pts | Status | Notes |
 |---|------|------|-----|--------|-------|
@@ -467,7 +486,7 @@ For each: forward pass / backward pass / numerics match CUDA (within tolerance)
 
 ---
 
-## 13. Serialization & Model Portability -- Rank: **2**
+## 13. Serialization & Model Portability -- Level: **2**
 
 | # | Item | Path | Pts | Status | Notes |
 |---|------|------|-----|--------|-------|
@@ -481,7 +500,7 @@ For each: forward pass / backward pass / numerics match CUDA (within tolerance)
 
 ---
 
-## 14. Distributed Training -- Rank: **2**
+## 14. Distributed Training -- Level: **2**
 
 | # | Item | Path | Pts | Status | Notes |
 |---|------|------|-----|--------|-------|
@@ -514,7 +533,7 @@ For each: forward pass / backward pass / numerics match CUDA (within tolerance)
 
 ---
 
-## 15. Profiler -- Rank: **3**
+## 15. Profiler -- Level: **3**
 
 | # | Item | Path | Pts | Status | Notes |
 |---|------|------|-----|--------|-------|
@@ -528,7 +547,7 @@ For each: forward pass / backward pass / numerics match CUDA (within tolerance)
 
 ---
 
-## 16. DataLoader Integration -- Rank: **3**
+## 16. DataLoader Integration -- Level: **3**
 
 | # | Item | Pts | Status | Notes |
 |---|------|-----|--------|-------|
@@ -538,7 +557,7 @@ For each: forward pass / backward pass / numerics match CUDA (within tolerance)
 
 ---
 
-## 17. Future / In-Progress Modules -- Rank: **3**
+## 17. Additional PyTorch APIs -- Level: **3**
 
 | # | Item | Pts | Status | Notes |
 |---|------|-----|--------|-------|
@@ -548,7 +567,7 @@ For each: forward pass / backward pass / numerics match CUDA (within tolerance)
 
 ---
 
-## 18. Testing & Validation -- Rank: **2**
+## 18. Testing & Validation -- Level: **2**
 
 ### 18.1 Device-Generic Test Framework
 
@@ -587,7 +606,7 @@ For each: forward pass / backward pass / numerics match CUDA (within tolerance)
 
 ---
 
-## 19. Dtype Support Matrix -- Rank: **2**
+## 19. Dtype Support Matrix -- Level: **2**
 
 | Dtype | Pts | Compute | Storage | AMP Target | CUDA Parity | Notes |
 |-------|-----|---------|---------|------------|-------------|-------|
@@ -608,7 +627,7 @@ For each: forward pass / backward pass / numerics match CUDA (within tolerance)
 
 ---
 
-## 20. Numerical Accuracy -- Rank: **2**
+## 20. Numerical Accuracy -- Level: **2**
 
 | # | Item | Pts | Status | Notes |
 |---|------|-----|--------|-------|
@@ -621,21 +640,7 @@ For each: forward pass / backward pass / numerics match CUDA (within tolerance)
 
 ---
 
-## 21. Device Behavior Parity with CUDA -- Rank: **3**
-
-| # | Item | Pts | Status | Notes |
-|---|------|-----|--------|-------|
-| 21.1 | Default stream behavior matches CUDA (ops are async) | 2 | `[ ]` | |
-| 21.2 | `synchronize()` semantics match CUDA | 2 | `[ ]` | |
-| 21.3 | `non_blocking=True` behavior matches CUDA | 2 | `[ ]` | |
-| 21.4 | Tensor storage layout matches (contiguous, stride semantics) | 2 | `[ ]` | |
-| 21.5 | In-place op behavior matches (aliasing, grad implications) | 1 | `[ ]` | |
-| 21.6 | `.is_contiguous()` is correct | 2 | `[ ]` | |
-| 21.7 | Error messages reference correct device name (not "CUDA") | 1 | `[ ]` | |
-
----
-
-## 22. Ecosystem Compatibility -- Rank: **3**
+## 21. Ecosystem Compatibility -- Level: **3**
 
 | Library | Pts | Status | Version Tested | Notes |
 |---------|-----|--------|----------------|-------|
@@ -654,7 +659,7 @@ For each: forward pass / backward pass / numerics match CUDA (within tolerance)
 
 ---
 
-## 23. Registration API Quick Reference
+## 22. Registration API Quick Reference
 
 ### PrivateUse1 Path
 

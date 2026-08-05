@@ -12,9 +12,7 @@
 **Evaluation date**: _[FILL: date]_
 **Evaluator**: _[FILL: human or agent]_
 **vLLM version**: _[FILL: version]_
-**PyTorch readiness score**: _[FILL: X.X / 10 from PyTorch checklist]_
-
-**Status markers**: `[ ]` Not Ready | `[~]` Partially Ready | `[x]` Ready | `[N/A]` Not applicable
+**PyTorch readiness score**: _[FILL: XX% from PyTorch checklist]_
 
 **Important caveats**:
 - vLLM has not reached 1.0; all plugin interfaces are subject to change.
@@ -28,7 +26,10 @@
 ### Executive Summary
 
 _[FILL: Write a concise summary covering:
-- **Overall verdict** and score (X.X / 10)
+- **Overall Readiness**: X% (weighted: Y%)
+- **Notable insights**:
+  - Surprising finding or important context 1
+  - Surprising finding or important context 2
 - **Key strengths**:
   - Top strength 1
   - Top strength 2
@@ -36,115 +37,37 @@ _[FILL: Write a concise summary covering:
 - **Key gaps**:
   - Critical gap 1
   - Critical gap 2
-  - Critical gap 3
-- **Key next steps**:
-  - Highest-impact action 1
-  - Highest-impact action 2
-  - Highest-impact action 3
-- **Notable insights**:
-  - Surprising finding or important context 1
-  - Surprising finding or important context 2]_
+  - Critical gap 3]_
 
 ### Section Scores
 
-| Section | Rank | Max Pts | Earned | Pct | Weighted |
-|---------|------|---------|--------|-----|----------|
-| PyTorch Prerequisites | 1 | | | | |
-| Plugin Registration | 1 | | | | |
-| Platform Class | 1 | | | | |
-| Attention Backend | 1 | | | | |
-| Worker | 1 | | | | |
-| Custom Ops | 1 | | | | |
-| Model Runner | 2 | | | | |
-| KV Cache Management | 2 | | | | |
-| Memory Management | 2 | | | | |
-| Distributed | 2 | | | | |
-| Model Compatibility | 2 | | | | |
-| Dtype Support | 2 | | | | |
-| Compilation / Graph Capture | 3 | | | | |
-| Testing & CI | 3 | | | | |
-| Quantization | 3 | | | | |
-| Speculative Decoding | 3 | | | | |
-| Multimodal | 3 | | | | |
-| Profiling | 3 | | | | |
-| **TOTAL** | | | | | |
+| Section | Level | Max Pts | Earned | Pct |
+|---------|-------|---------|--------|-----|
+| PyTorch Prerequisites | 1 | | | |
+| Plugin Registration | 1 | | | |
+| Platform Class | 1 | | | |
+| Attention Backend | 1 | | | |
+| Worker | 1 | | | |
+| Custom Ops | 1 | | | |
+| Model Runner | 2 | | | |
+| KV Cache Management | 2 | | | |
+| Memory Management | 2 | | | |
+| Distributed | 2 | | | |
+| Model Compatibility | 2 | | | |
+| Dtype Support | 2 | | | |
+| Compilation / Graph Capture | 3 | | | |
+| Testing & CI | 3 | | | |
+| Quantization | 3 | | | |
+| Speculative Decoding | 3 | | | |
+| Multimodal | 3 | | | |
+| Profiling | 3 | | | |
+| **TOTAL** | | | | |
 
-### Calculation
-
-```
-Row scoring:
-  3 pts = Critical, 2 pts = Important, 1 pt = Nice-to-have
-  [x] = full points, [~] = half points, [ ] = 0, [N/A] = excluded from max
-
-Section score:
-  section_pct = earned_pts / max_pts
-
-Overall score formula:
-  weight_r = 1 / rank
-  Overall Score = (sum(section_pct * weight_r) / sum(weight_r)) * 10
-
-where the sums are over all applicable sections (excluding fully N/A sections).
-```
-
-### Final Verdict
-
-| Score | Verdict |
-|-------|---------|
-| 0 - 4 | **Not Ready** |
-| 4 - 7 | **Partially Ready** |
-| 7 - 10 | **Ready** |
-
-**Overall Score**: _____ / 10
-**Verdict**: _____
-
-### Summary
-
-_[FILL: Write as bullet points:
-- **Score**: X.X/10 (Verdict)
-- **Production-quality areas**: List fully implemented areas
-- **Attention**: Op count and supported features
-- **Model compatibility**: Architecture count and highlights
-- **Gaps**:
-  - Gap 1
-  - Gap 2
-- **Next steps**:
-  - Action 1
-  - Action 2
-- **Character**: One line on plugin's architecture and approach]_
+**Readiness**: _____ %
 
 ---
 
-## Scoring Model
-
-Each row has a **point value** (1-3) reflecting its importance:
-- **3 pts** = Critical (blocks basic functionality)
-- **2 pts** = Important (expected for production use)
-- **1 pt** = Nice-to-have (polish, edge cases)
-
-Each section has a **rank** (1-3) reflecting its criticality tier for vLLM accelerator integration:
-- **Rank 1** = Foundational (blocks basic functionality)
-- **Rank 2** = Core Production (expected for production use)
-- **Rank 3** = Quality of Life (polish, ecosystem, sustainability)
-
-**Row scoring**: `[x]` = full points, `[~]` = half points, `[ ]` = 0, `[N/A]` = excluded from max
-
-**Section score** = `section_pct = earned_pts / max_pts`
-
-**Overall score**:
-```
-weight_r = 1 / rank
-Overall Score = (sum(section_pct * weight_r) / sum(weight_r)) * 10
-```
-where the sums are over all applicable sections (excluding fully N/A sections).
-
-**Readiness verdict**:
-- **0 - 4** = Not Ready
-- **4 - 7** = Partially Ready
-- **7 - 10** = Ready
-
----
-
-## 0. PyTorch Backend Prerequisites -- Rank: **1**
+## 0. PyTorch Backend Prerequisites -- Level: **1**
 
 vLLM is built on PyTorch. A functional PyTorch backend is a hard prerequisite.
 Evaluate using the [PyTorch Accelerator Readiness Checklist](pytorch_checklist.md) first.
@@ -179,7 +102,7 @@ compilation/graph capture, and quantization support.
 
 ---
 
-## 1. Platform Plugin Registration -- Rank: **1**
+## 1. Platform Plugin Registration -- Level: **1**
 
 | # | Item | Pts | Status | Notes |
 |---|------|-----|--------|-------|
@@ -192,7 +115,7 @@ compilation/graph capture, and quantization support.
 
 ---
 
-## 2. Platform Class (inherits `vllm.platforms.interface.Platform`) -- Rank: **1**
+## 2. Platform Class (inherits `vllm.platforms.interface.Platform`) -- Level: **1**
 
 ### Required Class Variables
 
@@ -255,7 +178,7 @@ compilation/graph capture, and quantization support.
 
 ---
 
-## 3. Worker Implementation (inherits `WorkerBase`) -- Rank: **1**
+## 3. Worker Implementation (inherits `WorkerBase`) -- Level: **1**
 
 | # | Item | Pts | Status | Notes |
 |---|------|-----|--------|-------|
@@ -270,7 +193,7 @@ compilation/graph capture, and quantization support.
 
 ---
 
-## 4. Model Runner Implementation (inherits `ModelRunnerBase`) -- Rank: **2**
+## 4. Model Runner Implementation (inherits `ModelRunnerBase`) -- Level: **2**
 
 | # | Item | Pts | Status | Notes |
 |---|------|-----|--------|-------|
@@ -283,7 +206,7 @@ compilation/graph capture, and quantization support.
 
 ---
 
-## 5. Attention Backend (inherits `AttentionBackend`) -- Rank: **1**
+## 5. Attention Backend (inherits `AttentionBackend`) -- Level: **1**
 
 | # | Item | Pts | Status | Notes |
 |---|------|-----|--------|-------|
@@ -311,7 +234,7 @@ compilation/graph capture, and quantization support.
 
 ---
 
-## 6. KV Cache Management -- Rank: **2**
+## 6. KV Cache Management -- Level: **2**
 
 | # | Item | Pts | Status | Notes |
 |---|------|-----|--------|-------|
@@ -325,7 +248,7 @@ compilation/graph capture, and quantization support.
 
 ---
 
-## 7. Custom Ops Registration -- Rank: **1**
+## 7. Custom Ops Registration -- Level: **1**
 
 | # | Item | Pts | Status | Notes |
 |---|------|-----|--------|-------|
@@ -340,7 +263,7 @@ compilation/graph capture, and quantization support.
 
 ---
 
-## 8. Quantization Support -- Rank: **3**
+## 8. Quantization Support -- Level: **3**
 
 | # | Item | Pts | Status | Notes |
 |---|------|-----|--------|-------|
@@ -362,7 +285,7 @@ compilation/graph capture, and quantization support.
 
 ---
 
-## 9. Distributed Communication -- Rank: **2**
+## 9. Distributed Communication -- Level: **2**
 
 | # | Item | Pts | Status | Notes |
 |---|------|-----|--------|-------|
@@ -392,7 +315,7 @@ compilation/graph capture, and quantization support.
 
 ---
 
-## 10. Compilation & Graph Capture -- Rank: **3**
+## 10. Compilation & Graph Capture -- Level: **3**
 
 | # | Item | Pts | Status | Notes |
 |---|------|-----|--------|-------|
@@ -405,7 +328,7 @@ compilation/graph capture, and quantization support.
 
 ---
 
-## 11. Memory Management -- Rank: **2**
+## 11. Memory Management -- Level: **2**
 
 | # | Item | Pts | Status | Notes |
 |---|------|-----|--------|-------|
@@ -417,7 +340,7 @@ compilation/graph capture, and quantization support.
 
 ---
 
-## 12. Speculative Decoding -- Rank: **3**
+## 12. Speculative Decoding -- Level: **3**
 
 | # | Item | Pts | Status | Notes |
 |---|------|-----|--------|-------|
@@ -428,7 +351,7 @@ compilation/graph capture, and quantization support.
 
 ---
 
-## 13. Multimodal Support -- Rank: **3**
+## 13. Multimodal Support -- Level: **3**
 
 | # | Item | Pts | Status | Notes |
 |---|------|-----|--------|-------|
@@ -440,7 +363,7 @@ compilation/graph capture, and quantization support.
 
 ---
 
-## 14. Model Compatibility -- Rank: **2**
+## 14. Model Compatibility -- Level: **2**
 
 | # | Item | Pts | Status | Notes |
 |---|------|-----|--------|-------|
@@ -453,7 +376,7 @@ compilation/graph capture, and quantization support.
 
 ---
 
-## 15. Profiling & Observability -- Rank: **3**
+## 15. Profiling & Observability -- Level: **3**
 
 | # | Item | Pts | Status | Notes |
 |---|------|-----|--------|-------|
@@ -465,7 +388,7 @@ compilation/graph capture, and quantization support.
 
 ---
 
-## 16. Testing & Validation -- Rank: **3**
+## 16. Testing & Validation -- Level: **3**
 
 ### Functional Tests
 
@@ -503,7 +426,7 @@ compilation/graph capture, and quantization support.
 
 ---
 
-## 17. Dtype Support -- Rank: **2**
+## 17. Dtype Support -- Level: **2**
 
 | Dtype | Pts | Compute | KV Cache | Quantization | Notes |
 |-------|-----|---------|----------|-------------|-------|

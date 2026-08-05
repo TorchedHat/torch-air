@@ -1,6 +1,6 @@
 ---
 name: check-accelerator-readiness
-description: Evaluate a hardware accelerator's integration readiness with PyTorch and/or vLLM. Use when checking if an accelerator (XPU, NPU, openreg, HPU, custom) supports PyTorch's PrivateUse1/fork integration (device management, hooks, operators, AMP, autograd, torch.compile, distributed, profiler, serialization) and optionally vLLM's platform plugin (attention backends, worker, model runner, custom ops, KV cache, quantization, distributed). Accepts a backend name or source path as argument. Covers both PyTorch and vLLM in a single evaluation.
+description: Evaluate a hardware accelerator's integration readiness with PyTorch. Use when checking if an accelerator (XPU, NPU, openreg, HPU, custom) supports PyTorch's PrivateUse1/fork integration (device management, hooks, operators, AMP, autograd, torch.compile, distributed, profiler, serialization). Optionally evaluates vLLM platform plugin when explicitly requested. Accepts a backend name or source path as argument.
 ---
 
 # Check Accelerator Readiness
@@ -36,9 +36,9 @@ text or inline summaries. For each evaluation:
 
 4. **Fill the Readiness Score & Summary** (at the top of the document):
    - Compute per-section: `section_pct = earned_pts / max_pts` (excluding N/A)
-   - Compute weight: `weight_r = 1 / rank`
-   - Compute overall: `(sum(section_pct * weight_r) / sum(weight_r)) * 10`
-   - Fill the score table (sorted by rank), overall score (X.X / 10), verdict, and 3-5 sentence summary paragraph
+   - Compute weight: `weight_r = 1 / level`
+   - Compute overall readiness: `(sum(section_pct * weight_r) / sum(weight_r)) * 100`
+   - Fill the score table (sorted by level), overall readiness percentage, and executive summary
 
 5. **Append an Appendix** listing any discovered APIs not in the checklist
 
@@ -54,8 +54,8 @@ Before evaluation, determine which PyTorch template to use:
    Use `~/.claude/skills/check-accelerator-readiness/templates/pytorch_checklist.md`
    This template uses source-code probing (grep, TorchTalk) and scored checklists.
 
-2. **Closed-source OOT backend** (no public source, vendor-specific execution stack):
-   Use `~/.claude/skills/check-accelerator-readiness/templates/pytorch_checklist_oot_closed.md`
+2. **Private backend** (no public source, vendor-specific execution stack):
+   Use `~/.claude/skills/check-accelerator-readiness/templates/pytorch_checklist_private.md`
    This template produces a narrative research document using public information
    (vendor docs, blogs, benchmarks, community evidence, runtime introspection).
    Covers accelerators that bypass standard PU1/Fork paths: AOT compilation,
@@ -63,9 +63,9 @@ Before evaluation, determine which PyTorch template to use:
 
 Detection heuristic:
 - Source code found (local, GitHub, cloneable)? -> open-source template
-- Only pip package with no accessible source? -> closed-source template
-- Vendor uses model conversion + AOT compilation (not PU1 dispatch)? -> closed-source template
-- User explicitly specifies closed-source? -> closed-source template
+- Only pip package with no accessible source? -> private template
+- Vendor uses model conversion + AOT compilation (not PU1 dispatch)? -> private template
+- User explicitly specifies private/proprietary? -> private template
 
 ## Scope Detection
 
@@ -74,28 +74,28 @@ Determine what to evaluate:
 1. **PyTorch readiness** (always): Evaluate using the selected template
    (see Template Selection above)
 
-2. **vLLM readiness** (if applicable): Check if a vLLM plugin exists for this
-   accelerator. Search for:
+2. **vLLM readiness** (only on demand): Only evaluate vLLM if the user
+   explicitly requests it (e.g., "also check vLLM", "include vLLM",
+   "for pytorch and vllm"). Do NOT auto-detect or auto-evaluate vLLM.
+
+   When requested, search for:
    - A `vllm-<name>` or `vllm_<name>` package/repo
    - `vllm.platform_plugins` entry points in the backend's setup.py
    - A separate vLLM plugin repo (e.g., `vllm-ascend`, `vllm-hpu`)
 
-   If found, also evaluate vLLM readiness using
+   If found, evaluate using
    `~/.claude/skills/check-accelerator-readiness/templates/vllm_checklist.md`
 
-   For closed-source backends, vLLM assessment is part of the narrative
+   For private backends, vLLM assessment is part of the narrative
    research document -- the evaluator writes a dedicated vLLM section
    covering API endpoint vs native integration vs disaggregated setups.
-   No separate vLLM checklist is used for closed-source evaluations.
-
-3. **Ask the user** if scope is ambiguous: "I found the PyTorch backend. Should
-   I also check vLLM integration? I found a vllm plugin at <location>."
+   No separate vLLM checklist is used for private backend evaluations.
 
 ## Output Files
 
 Create `agent_space/` in the current project if it doesn't exist. Write:
 - `agent_space/pytorch_readiness_report_<backend>.md` -- open-source scored checklist
-- `agent_space/pytorch_readiness_research_<backend>.md` -- closed-source narrative research
+- `agent_space/pytorch_readiness_research_<backend>.md` -- private backend narrative research
 - `agent_space/vllm_readiness_report_<backend>.md` -- if vLLM scope detected (open-source only)
 - Print combined summary to user at the end
 
@@ -115,11 +115,11 @@ PyTorch source using TorchTalk MCP tools. This ensures the checklist reflects
 the latest APIs, hooks, and registration points.
 
 **Ground Rules (internal skill rules -- do NOT include in generated reports):**
-1. **Preserve structure**: Section numbering, table format, column layout, scoring model, rank assignments, and markdown structure must NOT change during refinement. Only row-level content (add/update/remove items within existing tables) may change.
-2. **Summary + rank table at top**: Every generated document must start with the Executive Summary and Section Scores table (sorted by rank) immediately after the header metadata. No report is valid without it.
-3. **No section reordering**: Sections stay in their original document order. Only the summary table sorts by rank.
+1. **Preserve structure**: Section numbering, table format, column layout, scoring model, level assignments, and markdown structure must NOT change during refinement. Only row-level content (add/update/remove items within existing tables) may change.
+2. **Summary + level table at top**: Every generated document must start with the Executive Summary and Section Scores table (sorted by level) immediately after the header metadata. No report is valid without it.
+3. **No section reordering**: Sections stay in their original document order. Only the summary table sorts by level.
 4. **Log changes**: After refinement, output a short changelog (added N items, updated M items, removed K items) so the user can review before evaluation proceeds.
-5. **No meta-content in output**: These ground rules, skill instructions, and internal process details must never appear in the final generated report. The report is a standalone evaluation document.main
+5. **No meta-content in output**: These ground rules, skill instructions, agent instructions, procedural steps (e.g., "The agent should...", "Check if...", "Search for...", "Once detected, the agent should..."), and internal process details must never appear in the final generated report. When copying templates, strip all instructional prose -- keep only headings, fillable tables, and filled-in content. The report is a standalone evaluation document for the reader, not a how-to guide for the evaluator.
 
 **Step 1: Ensure PyTorch source is current**
 - Check TorchTalk status via `get_status`. If not available, skip refinement and proceed with existing template.
@@ -214,9 +214,9 @@ For each section, probe via source analysis or runtime testing. For each row:
 - `[x]` = full points, `[~]` = half points, `[ ]` = 0, `[N/A]` = excluded
 - Fill Status, Notes, and Pts columns
 
-**Probe order (by rank, rank 1 = most critical):**
+**Probe order (by level, level 1 = most critical):**
 
-**Rank 1 -- Foundational (probe first):**
+**Level 1 (probe first):**
 - Section 1: Device Registration & Management
 - Section 8: Operator Registration (minimal kernels, extended ops, model validation, fallbacks, custom ops)
 - Section 10: Autograd
@@ -224,7 +224,7 @@ For each section, probe via source analysis or runtime testing. For each row:
 - Section 2: Accelerator Hooks [PU1]
 - Section 5: Memory & Allocator
 
-**Rank 2 -- Core Production:**
+**Level 2:**
 - Section 13: Serialization & Model Portability
 - Section 9: Python Frontend
 - Section 11: AMP
@@ -234,12 +234,11 @@ For each section, probe via source analysis or runtime testing. For each row:
 - Section 20: Numerical Accuracy
 - Section 18: Testing & CI
 
-**Rank 3 -- Quality of Life:**
+**Level 3:**
 - Section 6: Streams & Events
 - Section 7: RNG & Generator
 - Section 4: Autoload [PU1]
 - Section 16: DataLoader
-- Section 21: CUDA Behavior Parity
 - Section 15: Profiler
 - Section 22: Ecosystem Compatibility
 - Section 17: Future Modules
@@ -250,17 +249,104 @@ For each section, probe via source analysis or runtime testing. For each row:
 2. Query dispatcher for registered ops not tested in Section 8
 3. Check hook overrides beyond Section 2
 
+### Phase 2.5: Upstream Candidate Discovery (Section 24)
+
+Section 24 is a non-scored advisory section. Goal: find features the backend
+built that are generic enough to benefit all PU1/accelerator backends if
+upstreamed to PyTorch core.
+
+#### Step 1: Find candidates (systematic diff)
+
+The backend's source falls into two buckets:
+- **Required PU1 plumbing** -- what Section 23 (Registration API Quick
+  Reference) lists. Every PU1 backend must do these. Not upstream candidates.
+- **Everything else** -- infrastructure the backend built beyond the required
+  registration points. These are the candidates.
+
+To find "everything else":
+
+1. **Inventory the backend's public surface** -- list all Python modules,
+   C++ source files, and exported symbols that are NOT direct implementations
+   of a Section 1-22 checklist item. Focus on:
+   - Python modules beyond the device module (profiler, memory, diagnostics, patches)
+   - C++ files beyond the standard hooks/guard/allocator/generator
+   - Monkey patches applied to `torch.*` or `torch._dynamo.*`
+   - Custom context managers, decorators, or utilities
+
+2. **Grep for infrastructure patterns** -- scan for code that wraps, extends,
+   or works around PyTorch core APIs:
+   ```
+   grep -rn "monkey_patch\|patch_torch\|_original_" <backend>/ --include="*.py"
+   grep -rn "fallback\|cpu_fallback\|fast_path" <backend>/ --include="*.py" --include="*.cpp"
+   grep -rn "class.*Wrapper\|class.*Shim\|class.*Bridge" <backend>/ --include="*.py"
+   grep -rn "explain\|diagnose\|hidden.*overhead" <backend>/ --include="*.py"
+   grep -rn "reentrancy\|reentrant\|nested.*compile" <backend>/ --include="*.py"
+   grep -rn "topology\|device_summary\|physical_device" <backend>/ --include="*.py"
+   grep -rn "offload\|layout_like\|empty_cache" <backend>/ --include="*.py"
+   ```
+
+3. **Compare against other backends** -- if available (torch_npu, torch_xla,
+   intel_extension_for_pytorch), check whether they independently built similar
+   infrastructure. Two+ backends solving the same problem independently is a
+   strong upstream signal.
+
+#### Step 2: Classify each candidate
+
+Apply these concrete tests in order:
+
+**Generic** (ready to upstream):
+- Contains zero references to backend-specific types, APIs, or hardware names
+- Could be copy-pasted into `torch/accelerator/` and work for any PU1 backend
+- Examples: device-index normalization, reentrancy guard, region-based profiler
+  framework, atexit shutdown handler
+
+**Needs Abstraction** (concept generic, implementation coupled):
+- Solves a problem every backend faces, BUT implementation references
+  backend-specific internals (allocator, compiler, runtime API)
+- Upstream path: define an interface/hook in core, let backends implement
+- Test: "Could another backend use this if we replaced the backend-specific
+  calls with hook methods?" If yes, Needs Abstraction.
+- Examples: `empty_cache()` with backend-specific cache types, explain profiler
+  with backend-specific signal names, view-aware dispatch with backend-specific
+  bad-pattern list
+
+**Hardware-Specific** (not upstreamable):
+- Solves a problem unique to this hardware's architecture, ISA, or runtime
+- Other backends would never need this
+- Examples: device-specific memory alignment workarounds, hardware topology
+  that only this NPU uses, compiler-specific IR limitations
+
+#### Step 3: Write upstream notes
+
+For each Generic or Needs Abstraction feature, write:
+- What the PyTorch core API would look like (function signature, module path)
+- What the backend would implement (hook method, registration call)
+- Whether PyTorch core already has a partial equivalent (grep pytorch source)
+
+#### Categories to organize findings
+
+Place discoveries into whichever of these 7 categories fits. Leave categories
+empty (no rows) if nothing found.
+
+| Category | What to look for |
+|----------|-----------------|
+| 24.1 CPU Fallback Infrastructure | Generic fallback dispatcher, diagnostic counters, per-op tracking, fast-path registry |
+| 24.2 Profiler / Explain Framework | Hidden-overhead detection, region profiling, cause/remedy mapping, diff analysis |
+| 24.3 View-Aware Dispatch | View recipe detection, shape simulation, fallback-to-contiguous policies |
+| 24.4 Memory Management Patterns | `empty_cache()` with plugin points, offload context managers, layout affinity |
+| 24.5 Device Topology & Utilities | Topology visualization, logical-to-physical mapping, capability queries |
+| 24.6 Compile Integration Patterns | Reentrancy guards, event isolation, recompile limit handling, compile-only mode |
+| 24.7 New Hooks / API Extensions | Methods beyond `AcceleratorHooksInterface`, new `torch.accelerator.*` APIs |
+
 ### Phase 3: Scoring (Summary at top of document)
 
 ```
 Section Pct = earned_pts / max_pts (excluding N/A rows)
-weight_r = 1 / rank
-Overall Score = (sum(Section Pct * weight_r) / sum(weight_r)) * 10
+weight_r = 1 / level
+Readiness = (sum(Section Pct * weight_r) / sum(weight_r)) * 100
 ```
 
-Verdict: 0 - 4 Not Ready | 4 - 7 Partially Ready | 7 - 10 Ready
-
-Fill the summary score table (sorted by rank) at the top of the document and write the 3-5 sentence summary paragraph.
+Fill the score table (sorted by level) at the top of the document, the overall readiness percentage, and the executive summary.
 
 ---
 
@@ -351,8 +437,8 @@ Check compute, KV cache, quantization support per dtype.
 
 ### Scoring (Summary at top of document)
 
-Fill the summary score table (sorted by rank) at the top of the document.
-Use `weight_r = 1/rank`, overall = `(sum(section_pct * weight_r) / sum(weight_r)) * 10`.
+Fill the summary score table (sorted by level) at the top of the document.
+Use `weight_r = 1/level`, readiness = `(sum(section_pct * weight_r) / sum(weight_r)) * 100`.
 Append Appendix of uncovered APIs.
 
 ---
@@ -367,26 +453,24 @@ After both evaluations, present a combined summary:
 ╠══════════════════════════════════════════════════════════════╣
 ║                                                              ║
 ║  PYTORCH INTEGRATION                                         ║
-║  Score: X.X / 10  [Verdict]                                  ║
+║  Readiness: XX%                                              ║
 ║                                                              ║
-║    Device management:     34/35  R1  97%                     ║
-║    Operators:             85/92  R2  92%                     ║
-║    Autograd:              18/20  R3  90%                     ║
+║    Device management:     34/35  L1  97%                     ║
+║    Operators:             85/92  L1  92%                     ║
+║    Autograd:              18/20  L1  90%                     ║
 ║    ...                                                       ║
 ║                                                              ║
 ║  VLLM INTEGRATION (if evaluated)                             ║
-║  Score: X.X / 10  [Verdict]                                  ║
+║  Readiness: XX%                                              ║
 ║                                                              ║
-║    PyTorch prereqs:       28/28  R1  100%                    ║
-║    Plugin registration:    6/6   R2  100%                    ║
-║    Platform class:        25/29  R3   86%                    ║
+║    PyTorch prereqs:       28/28  L1  100%                    ║
+║    Plugin registration:    6/6   L1  100%                    ║
+║    Platform class:        25/29  L1   86%                    ║
 ║    ...                                                       ║
 ║                                                              ║
 ║  Reports:                                                    ║
 ║    agent_space/pytorch_readiness_report_<backend>.md          ║
 ║    agent_space/vllm_readiness_report_<backend>.md             ║
-║                                                              ║
-║  Summary: <3-5 sentence paragraph>                           ║
 ╚══════════════════════════════════════════════════════════════╝
 ```
 
@@ -395,6 +479,6 @@ After both evaluations, present a combined summary:
 - Every probe must be wrapped in try/except. One failure must not stop the evaluation.
 - If the backend is only partially implemented, produce a partial report.
 - For items that cannot be checked (e.g., "CI pipeline"), mark as "Requires manual verification".
-- PyTorch evaluation always runs. vLLM evaluation only runs if a plugin is detected.
+- PyTorch evaluation always runs. vLLM evaluation only runs when the user explicitly requests it.
 - The PyTorch score feeds into vLLM Section 0 as a prerequisite.
 - All output files go in `agent_space/` (git-ignored).
