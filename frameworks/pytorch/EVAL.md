@@ -18,9 +18,11 @@ the latest APIs, hooks, and registration points.
 4. **Log changes**: After refinement, output a short changelog (added N items, updated M items, removed K items) so the user can review before evaluation proceeds.
 5. **No meta-content in output**: These ground rules, skill instructions, agent instructions, procedural steps (e.g., "The agent should...", "Check if...", "Search for...", "Once detected, the agent should..."), scoring model explanations, calculation formulas, and internal process details must never appear in the final generated report. When copying templates, strip all instructional prose, the Scoring Model section, and the Calculation section -- keep only headings, fillable tables, and filled-in content. The report is a standalone evaluation document for the reader, not a how-to guide for the evaluator.
 
-**Step 1: Ensure PyTorch source is current**
-- Check TorchTalk status via `get_status`. If not available, skip refinement and proceed with existing template.
-- If PyTorch source is local, fetch latest main: `git -C <pytorch_path> fetch pytorch/pytorch main`
+**Step 1: Ensure PyTorch source is available**
+- PyTorch source acquisition is handled in Phase 0 Step 0c. The resolved
+  source path is stored in `PYTORCH_SOURCE`.
+- If `PYTORCH_SOURCE` is not set (both TorchTalk and clone failed), skip
+  refinement and proceed with the existing template as-is.
 
 **Step 2: Validate existing checklist items**
 
@@ -51,9 +53,10 @@ bindings, not C++ infrastructure like macros/registration functions).
 | Sec 15: Profiler | `grep` | `REGISTER_PRIVATEUSE1_PROFILER`, `ProfilerStubs` in `torch/` | Profiler registration API |
 | Sec 18: Testing | TorchTalk `tests` | mode=find query=`privateuse1` focus=files | Test file inventory |
 
-All `grep` commands run against the PyTorch source path from TorchTalk `get_status`
-(e.g., `/home/devuser/pytorch`). Use `grep -rn --include="*.py" --include="*.h"
---include="*.cpp"` for broad coverage.
+All `grep` commands run against `PYTORCH_SOURCE` (set in Phase 0 Step 0c).
+Use `grep -rn --include="*.py" --include="*.h" --include="*.cpp"` for broad
+coverage. TorchTalk queries are only executed when TorchTalk is available;
+otherwise those rows are skipped and grep provides the coverage.
 
 For each query:
 - If API still exists with same signature: no change needed
@@ -90,6 +93,8 @@ Log all changes (additions, modifications, removals) so the user can review.
 
 ### Phase 0: Source Discovery & Integration Path Detection
 
+#### Step 0a: Backend Source Discovery
+
 The user may not have the repo locally. The agent should:
 
 1. **Check locally first**: `~/Dev/`, `~/projects/`, `pip show`, `python -c "import torch_<name>"`
@@ -97,6 +102,89 @@ The user may not have the repo locally. The agent should:
 3. **Clone if needed**: `git clone --depth 1 <url> /tmp/<name>`
 4. **Ask the user** only as a last resort
 5. **Determine backend version**: Use `gh release list --repo <owner>/<repo> --limit 1`, `git describe --tags`, or `pip show <package>` to find the latest release version. Record it in the report header and the Source Discovery table.
+
+#### Step 0b: PyTorch Version Resolution
+
+Determine which PyTorch upstream version to evaluate the backend against.
+The backend source must be available (from Step 0a) before this step.
+Let `BACKEND_SOURCE` = the backend path from Step 0a (e.g., `/tmp/torch_npu`).
+
+1. **User-specified version**: If `--pytorch-version <ver>` was provided,
+   set `PYTORCH_VERSION=<ver>`. This overrides all auto-detection — the
+   backend will be evaluated against this PyTorch version regardless of
+   what it targets.
+   Validate it exists: `pip index versions torch | grep <ver>` or
+   `gh api repos/pytorch/pytorch/git/refs/tags/v<ver>`.
+
+2. **Environment-detected version**: If no version was specified, detect
+   from the current environment:
+   ```
+   python -c "import torch; print(torch.__version__)"
+   ```
+   Parse the base version (strip `+cu118`, `+cpu`, device suffixes, etc.)
+   and set `PYTORCH_VERSION` to the result.
+   If torch is not installed, fall back to step 3.
+
+3. **Detect from backend source**: Extract the PyTorch version the backend
+   targets from `BACKEND_SOURCE`:
+   ```
+   grep -rn "torch[>=!~]=\|torch==" $BACKEND_SOURCE/setup.py $BACKEND_SOURCE/pyproject.toml $BACKEND_SOURCE/setup.cfg $BACKEND_SOURCE/requirements*.txt 2>/dev/null
+   ```
+   Parse the version from the match:
+   - `torch==2.4.0` → `PYTORCH_VERSION=2.4.0` (exact pin, most reliable)
+   - `torch>=2.4.0` → `PYTORCH_VERSION=2.4.0` (lower bound)
+   - `torch>=2.4,<2.6` → `PYTORCH_VERSION=2.4.0` (use the lower bound)
+
+   Also check: `pip show <backend_package> | grep Requires` if installed,
+   or backend release tags that mirror PyTorch versions (e.g., backend
+   `v2.1.0` → `PYTORCH_VERSION=2.1.0`).
+
+   Use the most specific version found (exact pin > lower bound > tag match).
+
+4. **Fallback to latest stable**: If none of the above yields a version,
+   use the latest stable PyTorch release:
+   `pip index versions torch | head -1` or
+   `gh release list --repo pytorch/pytorch --limit 1`.
+   Set `PYTORCH_VERSION` to the result.
+
+Once resolved:
+- Record `PYTORCH_VERSION` in the report header metadata (`PyTorch base`).
+- Log to user: `Evaluating against PyTorch <PYTORCH_VERSION> (source:
+  user-specified | environment-detected | backend-detected | latest stable)`.
+
+#### Step 0c: PyTorch Source Acquisition
+
+The evaluation needs PyTorch source at `PYTORCH_VERSION` (from Step 0b)
+to refine the checklist and validate APIs.
+
+1. **TorchTalk**: Call `get_status()`.
+   - If TorchTalk is available, read the PyTorch source path and indexed
+     git commit/version from the response.
+   - Compare the indexed version against `PYTORCH_VERSION`.
+   - If they match: set `PYTORCH_SOURCE` to TorchTalk's source path.
+     Use TorchTalk MCP tools + grep. This is the best path — full
+     cross-language analysis.
+   - If they don't match: log a warning (`TorchTalk indexed at PyTorch
+     <indexed_ver>, but evaluating against <PYTORCH_VERSION> — falling
+     back to cloned source for version-specific checks`). TorchTalk tools
+     can still be used for structural queries (call graphs, module tracing)
+     that are stable across versions, but all version-sensitive grep
+     queries (API signatures, registration macros) must run against the
+     cloned source from step 2 below.
+
+2. **Clone fallback**: If TorchTalk is not available, or if the indexed
+   version doesn't match `PYTORCH_VERSION`:
+   ```
+   git clone --depth 1 --branch v$PYTORCH_VERSION https://github.com/pytorch/pytorch.git /tmp/pytorch-$PYTORCH_VERSION
+   ```
+   Set `PYTORCH_SOURCE=/tmp/pytorch-$PYTORCH_VERSION`.
+   TorchTalk-only queries (marked `TorchTalk` in the Pre-Phase table)
+   are skipped — grep covers the C++ macros, registration APIs, and
+   Python-side patterns needed for checklist refinement.
+
+`PYTORCH_SOURCE` now points to PyTorch source at the correct version for
+use in all subsequent phases (Pre-Phase grep, Phase 1 probing, Phase 2.5
+upstream comparison).
 
 Then detect **PU1 vs Fork**:
 - `grep -r "rename_privateuse1_backend\|register_privateuse1_backend"` -> PU1
