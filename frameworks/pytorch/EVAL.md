@@ -113,19 +113,18 @@ Let `BACKEND_SOURCE` = the backend path from Step 0a (e.g., `/tmp/torch_npu`).
    set `PYTORCH_VERSION=<ver>`. This overrides all auto-detection — the
    backend will be evaluated against this PyTorch version regardless of
    what it targets.
-   Validate it exists: `pip index versions torch | grep <ver>` or
-   `gh api repos/pytorch/pytorch/git/refs/tags/v<ver>`.
-
-2. **Environment-detected version**: If no version was specified, detect
-   from the current environment:
+   Validate the version exists:
    ```
-   python -c "import torch; print(torch.__version__)"
+   git ls-remote --tags https://github.com/pytorch/pytorch.git refs/tags/v<ver>
    ```
-   Parse the base version (strip `+cu118`, `+cpu`, device suffixes, etc.)
-   and set `PYTORCH_VERSION` to the result.
-   If torch is not installed, fall back to step 3.
+   If validation fails, **stop and error** — do not fall through to
+   auto-detection. Display a message listing available versions:
+   ```
+   git ls-remote --tags https://github.com/pytorch/pytorch.git "v*" | grep -oP 'v\d+\.\d+\.\d+$' | sort -V | tail -20
+   ```
+   Example: `Error: PyTorch version 2.20.0 does not exist. Recent releases: 2.3.0, 2.4.0, 2.5.0, ...`
 
-3. **Detect from backend source**: Extract the PyTorch version the backend
+2. **Detect from backend source**: Extract the PyTorch version the backend
    targets from `BACKEND_SOURCE`:
    ```
    grep -rn "torch[>=!~]=\|torch==" $BACKEND_SOURCE/setup.py $BACKEND_SOURCE/pyproject.toml $BACKEND_SOURCE/setup.cfg $BACKEND_SOURCE/requirements*.txt 2>/dev/null
@@ -141,16 +140,21 @@ Let `BACKEND_SOURCE` = the backend path from Step 0a (e.g., `/tmp/torch_npu`).
 
    Use the most specific version found (exact pin > lower bound > tag match).
 
-4. **Fallback to latest stable**: If none of the above yields a version,
+3. **Fallback to latest stable**: If none of the above yields a version,
    use the latest stable PyTorch release:
-   `pip index versions torch | head -1` or
-   `gh release list --repo pytorch/pytorch --limit 1`.
+   ```
+   pip index versions torch | head -1
+   ```
+   Or if pip is not available:
+   ```
+   git ls-remote --tags https://github.com/pytorch/pytorch.git "v*" | grep -oP 'v\d+\.\d+\.\d+$' | sort -V | tail -1
+   ```
    Set `PYTORCH_VERSION` to the result.
 
 Once resolved:
 - Record `PYTORCH_VERSION` in the report header metadata (`PyTorch base`).
 - Log to user: `Evaluating against PyTorch <PYTORCH_VERSION> (source:
-  user-specified | environment-detected | backend-detected | latest stable)`.
+  user-specified | backend-detected | latest stable)`.
 
 #### Step 0c: PyTorch Source Acquisition
 
@@ -177,6 +181,14 @@ to refine the checklist and validate APIs.
    ```
    git clone --depth 1 --branch v$PYTORCH_VERSION https://github.com/pytorch/pytorch.git /tmp/pytorch-$PYTORCH_VERSION
    ```
+   If the clone fails (tag not found), try normalizing the version:
+   - Try `v$PYTORCH_VERSION.0` (e.g., `v2.4` → `v2.4.0`)
+   - If both fail, list matching tags and suggest the closest:
+     ```
+     git ls-remote --tags https://github.com/pytorch/pytorch.git "v${PYTORCH_VERSION}*"
+     ```
+     Error with: `Tag v$PYTORCH_VERSION not found. Similar tags: v2.4.0, v2.4.1, ...`
+
    Set `PYTORCH_SOURCE=/tmp/pytorch-$PYTORCH_VERSION`.
    TorchTalk-only queries (marked `TorchTalk` in the Pre-Phase table)
    are skipped — grep covers the C++ macros, registration APIs, and
@@ -336,3 +348,15 @@ Readiness = (sum(Section Pct * weight_r) / sum(weight_r)) * 100
 ```
 
 Fill the score table (sorted by level) at the top of the document, the overall readiness percentage, and the executive summary.
+
+### Phase 4: Cleanup
+
+If PyTorch source was cloned during Step 0c (i.e., `PYTORCH_SOURCE`
+points to `/tmp/pytorch-$PYTORCH_VERSION`), log a message to the user:
+
+```
+Note: PyTorch source was cloned to /tmp/pytorch-<version> for this evaluation.
+To free disk space, you may remove it later: rm -rf /tmp/pytorch-<version>
+```
+
+Do NOT auto-delete the cloned source — the user decides when to clean up.
