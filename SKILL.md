@@ -1,30 +1,31 @@
 ---
 name: torch-accelerator-readiness
-description: Evaluate a hardware accelerator's integration readiness with PyTorch. Use when checking if an accelerator (XPU, NPU, openreg, HPU, custom) supports PyTorch's PrivateUse1/fork integration (device management, hooks, operators, AMP, autograd, torch.compile, distributed, profiler, serialization). Accepts a backend name or source path as argument.
+description: Evaluate a hardware accelerator's integration readiness with PyTorch and all other frameworks listed in the Framework Dispatch table. Use when checking if an accelerator (XPU, NPU, openreg, HPU, custom) supports PyTorch's PrivateUse1/fork integration (device management, hooks, operators, AMP, autograd, torch.compile, distributed, profiler, serialization). Accepts a backend name or source path as argument.
 ---
 
 # Check Accelerator Readiness
 
 You are an accelerator integration evaluator. Given a backend name or source
-path, you evaluate its integration readiness with **PyTorch**. You produce
-scored readiness reports with concrete findings.
+path, you evaluate its integration readiness with every framework listed in the
+**Framework Dispatch** table below. You produce scored readiness reports with
+concrete findings — one report file per framework.
 
 ## Inputs
 
-The user provides one of:
-- A backend name (e.g., `ascend npu`, `habana gaudi`, `openreg`)
-- A source path (e.g., `/home/user/torch_npu`)
-- A GitHub URL
+The user provides:
+- A **backend** (required): a name (e.g., `openreg`, `ascend npu`), a local source path, or a GitHub URL
+- `--framework <name>` (optional, repeatable): which framework(s) to run — `pytorch`, `vllm`. Omit to run all.
+- `--pytorch-version <version>` (optional): PyTorch version to evaluate against (e.g., `2.6.0`). Independent of `--framework`. Defaults to latest.
+- `--vllm-version <version>` (optional): vLLM version to evaluate against (e.g., `v0.9.1`). Independent of `--framework`. Defaults to latest.
 
-If no input is provided, ask for one.
+The two flag groups are orthogonal: `--framework` controls which frameworks run; version flags control what version each uses. If no backend is provided, ask for one.
 
 ## Output Format -- MANDATORY
 
 The final report **MUST** be a proper filled-in markdown checklist, not free-form
-text or inline summaries. For each evaluation:
+text or inline summaries. For each framework evaluation:
 
-1. **Read the checklist template** from `frameworks/pytorch/`
-   - `checklist.md` for PyTorch evaluation
+1. **Read the checklist template** from the framework's directory (see Framework Dispatch table)
 
 2. **Copy the template** to `torch-air-report/` as the working report file
 
@@ -47,7 +48,7 @@ The output file must be a **complete, standalone markdown document** that render
 correctly and can be shared as-is. Never skip the markdown report in favor of
 an inline text summary -- the filled checklist IS the deliverable.
 
-## Template Selection
+## Template Selection (PyTorch only)
 
 Before evaluation, determine which PyTorch template to use:
 
@@ -71,9 +72,10 @@ Detection heuristic:
 ## Time Estimate
 
 After the backend has been located and its integration path detected (open-source
-vs. private, PrivateUse1 vs. Fork) but **before** the scored probing begins, print
-a tentative estimate of how long generating this report will take for this specific
-accelerator. Judge the range from the runtime drivers you just discovered:
+vs. private, PrivateUse1 vs. Fork) but **before** the scored probing begins for
+each framework, print a per-framework tentative estimate of how long that
+framework's evaluation will take. Judge the range from the runtime drivers you
+just discovered:
 
 - **Integration path** -- a private/narrative evaluation does web research and is
   slower than an open-source source-code probe.
@@ -83,18 +85,21 @@ accelerator. Judge the range from the runtime drivers you just discovered:
 Present it as a rough range and state clearly that it is an approximation, e.g.:
 
 ```
-Estimated report time: ~8-12 min (open-source, PrivateUse1, ~15 applicable sections).
-This is a rough estimate, not a guarantee.
+PyTorch: ~6-9 min (open-source, PrivateUse1, ~15 applicable sections). Rough estimate, not a guarantee.
+vLLM:    ~4-6 min (OOT plugin, ~10 applicable sections). Rough estimate, not a guarantee.
 ```
 
-Record the wall-clock time at this step so the actual duration can be reported in
-the final summary.
+Record the wall-clock time at the start of each framework's evaluation so the
+actual duration can be reported per framework in the final summary.
 
 ## Output Files
 
-Create `torch-air-report/` in the current project if it doesn't exist. Write:
-- `torch-air-report/torch_readiness_report_<backend>.md` -- open-source scored checklist
-- `torch-air-report/torch_readiness_research_<backend>.md` -- private backend narrative research
+Create `torch-air-report/` in the current project if it doesn't exist. Write one
+report file per **evaluated** framework only — frameworks not selected by the user
+do not produce a file:
+- `torch-air-report/torch_readiness_report_<backend>.md` -- PyTorch open-source scored checklist
+- `torch-air-report/torch_readiness_research_<backend>.md` -- PyTorch private backend narrative research
+- `torch-air-report/vllm_readiness_report_<backend>.md` -- vLLM scored checklist
 - Print summary to user at the end
 
 ---
@@ -103,26 +108,36 @@ Create `torch-air-report/` in the current project if it doesn't exist. Write:
 
 Each framework lives under `frameworks/<name>/` with its own `EVAL.md` and
 checklist templates. To add a new framework, create the directory and add an
-entry to the dispatch table below. Only frameworks listed here are evaluated.
+entry to the dispatch table below.
 
-| Framework | Directory | When to evaluate | EVAL.md |
-|-----------|-----------|-----------------|---------|
-| PyTorch | `frameworks/pytorch/` | Always | `frameworks/pytorch/EVAL.md` |
+This table is the sole source of truth for available frameworks. Do NOT consult
+git history to determine which frameworks are active.
 
-For each framework in the table, read its `EVAL.md` and follow all phases.
+| Framework | Keyword | Directory | EVAL.md | Output file |
+|-----------|---------|-----------|---------|-------------|
+| PyTorch | `pytorch` | `frameworks/pytorch/` | `frameworks/pytorch/EVAL.md` | `torch-air-report/torch_readiness_report_<backend>.md` |
+| vLLM | `vllm` | `frameworks/vllm/` | `frameworks/vllm/EVAL.md` | `torch-air-report/vllm_readiness_report_<backend>.md` |
+
+**Execution rules:**
+- If `--framework` is not given → evaluate every framework in this table.
+- If `--framework` is given → evaluate only the specified framework(s).
+- `--pytorch-version` and `--vllm-version` are independent of `--framework`: they set the version for their framework regardless of which frameworks are selected.
+- Pass each resolved version to the corresponding EVAL.md. If a version flag is omitted, default to latest (`main`).
 
 ---
 
 ## Final Output: Summary
 
-After evaluation, present a summary:
+After all framework evaluations are complete, print this summary to the terminal.
+Include **one block per evaluated framework only** — omit blocks for frameworks
+that were not run. Show the resolved version next to each framework name.
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
 ║        Accelerator Readiness Report: <backend>              ║
 ╠══════════════════════════════════════════════════════════════╣
 ║                                                              ║
-║  PYTORCH INTEGRATION                                         ║
+║  PYTORCH INTEGRATION  (v2.6.0)                               ║
 ║  Readiness: XX%                                              ║
 ║                                                              ║
 ║    Device management:     34/35  L1  97%                     ║
@@ -130,18 +145,29 @@ After evaluation, present a summary:
 ║    Autograd:              18/20  L1  90%                     ║
 ║    ...                                                       ║
 ║                                                              ║
-║  Time:                                                      ║
-║    Estimated (active):   ~8-12 min                           ║
-║    Actual (wall-clock):  18 min                              ║
-║    Actual (active):      11 min                              ║
+║    Time — Estimated (active):  ~6-9 min                      ║
+║            Actual (wall-clock): 10 min                       ║
+║            Actual (active):      8 min                       ║
 ║                                                              ║
-║  Report:                                                     ║
+║  VLLM INTEGRATION  (v0.9.1)                                  ║
+║  Readiness: XX%                                              ║
+║                                                              ║
+║    Plugin Registration:   12/12  L1 100%                     ║
+║    Platform Class:        18/20  L1  90%                     ║
+║    Worker Core:           14/16  L1  88%                     ║
+║    ...                                                       ║
+║                                                              ║
+║    Time — Estimated (active):  ~4-6 min                      ║
+║            Actual (wall-clock):  8 min                       ║
+║            Actual (active):      5 min                       ║
+║                                                              ║
+║  Reports:                                                    ║
 ║    torch-air-report/torch_readiness_report_<backend>.md      ║
+║    torch-air-report/vllm_readiness_report_<backend>.md       ║
 ╚══════════════════════════════════════════════════════════════╝
 ```
 
-Report three time figures, all measured from the Time Estimate step to report
-completion:
+Report three time figures **per framework**, each measured from that framework's Time Estimate step to completion of its evaluation:
 
 - **Estimated (active)** -- the earlier estimate. It covers active compute/probing
   time only and never includes time spent waiting on the user.
