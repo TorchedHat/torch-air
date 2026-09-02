@@ -190,20 +190,37 @@ Reports are written to `torch-air-report/`:
 torch-air-report/torch_readiness_report_<backend>.md
 ```
 
+## Architecture Review
+
+Contributor tooling for reviewing assessment PRs against this repo's own
+conventions lives in
+[`.claude/skills/torch-air-architecture-review/README.md`](.claude/skills/torch-air-architecture-review/README.md).
+
 ## Repository Structure
 
 ```
 torch-air/
 ├── SKILL.md                          # Orchestrator: input parsing, dispatch, scoring, summary
+├── skills/
+│   └── torch-accelerator-readiness/
+│       └── SKILL.md                  # Symlink to ../../SKILL.md (plugin discovery)
+├── .claude/
+│   └── skills/
+│       └── torch-air-architecture-review/
+│           ├── SKILL.md              # Reviews torch-air PRs against checklist.md
+│           ├── checklist.md          # Architecture review checklist for assessment PRs
+│           └── README.md             # Usage docs for the architecture review skill
 ├── frameworks/
-│   ├── pytorch/
-│   │   ├── EVAL.md                   # PyTorch evaluation phases and probing instructions
-│   │   ├── checklist.md              # PyTorch readiness checklist template (open-source)
-│   │   ├── checklist_private.md      # Scored checklist for closed-source backends
-│   │   └── research_template_private.md  # Narrative research template for private backends
+│   └── pytorch/
+│       ├── EVAL.md                   # PyTorch evaluation phases and probing instructions
+│       ├── checklist.md              # PyTorch readiness checklist template (open-source)
+│       ├── checklist_private.md      # Scored checklist for closed-source backends
+│       └── research_template_private.md  # Narrative research template for private backends
 ├── crcr/
 │   └── crcr-l1-onboarding.md        # CRCR Level 1 onboarding guide
 └── README.md
 ```
 
 Adding a new framework: create `frameworks/<name>/` with `EVAL.md` (probing instructions) and `checklist.md` (fillable template), then add the framework to the dispatch table in `SKILL.md`.
+
+Adding a new evaluation dimension (e.g. security): nest under the parent framework at `frameworks/<framework>/<dimension>/`, extend the existing skill with flags (`--security`, `--all`), and do **not** add the dimension to the Framework Dispatch table.
