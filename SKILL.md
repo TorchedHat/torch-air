@@ -16,6 +16,14 @@ The user provides one of:
 - A source path (e.g., `/home/user/torch_npu`)
 - A GitHub URL
 
+Optional flags:
+- `--pytorch-version <version>` (e.g., `--pytorch-version 2.4.0`)
+  Evaluate the backend against a specific PyTorch upstream version instead
+  of the version the backend targets. Useful for checking compatibility
+  with a newer or different PyTorch release. If omitted, the skill detects
+  the PyTorch version from the backend's own dependency metadata, falling
+  back to the latest stable PyTorch release.
+
 If no input is provided, ask for one.
 
 ## Output Format -- MANDATORY
